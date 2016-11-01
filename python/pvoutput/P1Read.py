@@ -3,6 +3,7 @@ import sys
 from PyCRC.CRC16 import CRC16
 import re
 import csv
+import time
 
 # Serial port configuration
 port = '/dev/ttyACM0'
@@ -14,15 +15,18 @@ eot_char = '!' # End of transmission character
 CRC_length = 4 # 4 byte hexadecimal CRC16 value
 telegram_length = 23 # lines
 OBIS = [
-    ['Power received [low]', '1-0:1.8.1','(\d-\d):(\d\.?)+\((\d{6}\.\d{3})\*kWh\)'],
-    ['Power received [high]', '1-0:1.8.2','(\d-\d):(\d\.?)+\((\d{6}\.\d{3})\*kWh\)'],
-    ['Power delivered [low]', '1-0:2.8.1','(\d-\d):(\d\.?)+\((\d{6}\.\d{3})\*kWh\)'],
-    ['Power delivered [high]', '1-0:2.8.2','(\d-\d):(\d\.?)+\((\d{6}\.\d{3})\*kWh\)']
+    ['Energy import [low]', '1-0:1.8.1','(\d-\d):(\d\.?)+\((\d{6}\.\d{3})\*kWh\)'],
+    ['Energy import [high]', '1-0:1.8.2','(\d-\d):(\d\.?)+\((\d{6}\.\d{3})\*kWh\)'],
+    ['Energy export [low]', '1-0:2.8.1','(\d-\d):(\d\.?)+\((\d{6}\.\d{3})\*kWh\)'],
+    ['Energy export [high]', '1-0:2.8.2','(\d-\d):(\d\.?)+\((\d{6}\.\d{3})\*kWh\)'],
+    ['Power import', '1-0:1.7.0','(\d-\d):(\d\.?)+\((\d{2}\.\d{3})\*kW\)'],
+    ['Power export', '1-0:2.7.0','(\d-\d):(\d\.?)+\((\d{2}\.\d{3})\*kW\)']
 ]
 
 # Script configuration
-timeout = 2*telegram_length
-retries = 10
+max_length = 2*telegram_length
+timeout = 50
+output_path = '/home/pi/repository/python/pvoutput/input/'
 
 # Initialize variables
 ser = serial.Serial(port, baudrate)
@@ -35,10 +39,11 @@ def read_telegram(data):
 
     # Start receiving raw data
     data_raw = str(ser.readline())
+    print(data_raw)
     while (serial_number not in data_raw):
         data_raw = str(ser.readline())
         itt += 1
-        if (itt >= timeout):
+        if (itt >= max_length):
             print('[#] ERROR: Invalid data from meter')
             sys.exit()
 
@@ -78,8 +83,8 @@ def read_telegram(data):
             # Not the entire message is correct
             # However we don't need all lines to be Valid
             itt = 0
-
             print('[#] CRC mismatch: 0x%s / 0x%s' % (CRC,CRC_rec))
+
             for line in range (1,len(data)-1):
                 for desc, ref, regex in OBIS:
                     if(data[line].startswith(ref)):
@@ -96,13 +101,14 @@ def read_telegram(data):
         return False
 
 itt = 0
-while (itt < retries):
+start_time = time.time()
+while ((time.time()-start_time) < timeout):
     data = []
     if(read_telegram(data)):
         print('[#] Valid message received after %d retries' % (itt+1))
 
         # Write to CSV
-        f = open('/home/pi/repository/python/P1.csv','wt')
+        f = open(output_path + 'P1.csv','wt')
         writer = csv.writer(f)
         # Write header
         header = []
@@ -125,6 +131,6 @@ while (itt < retries):
         sys.exit()
     else:
         itt += 1
-        print('[#] Invalid message received, retrying... [%d/%d]' % (itt,retries))
+        print('[#] Invalid message received, retrying... [%d]' % itt)
 
-print('[#] No valid message received [%d/%d]' % (itt,retries))
+print('[#] No valid message received after %d retries' % itt)
