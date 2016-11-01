@@ -1,0 +1,6 @@
+shell/pvoutput/processed/
+shell/tmp/ARP_JOOST
+*.log
+python/pvoutput/input/
+python/pvoutput/output/
+shell/tmp/arp.sh
