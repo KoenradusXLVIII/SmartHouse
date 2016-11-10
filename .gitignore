@@ -1,6 +1,6 @@
 shell/pvoutput/processed/
-shell/tmp/ARP_JOOST
-*.log
+shell/tmp/
 python/pvoutput/input/
 python/pvoutput/output/
-shell/tmp/arp.sh
+arduino/P1Read/build-uno/
+*.log

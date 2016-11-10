@@ -1,7 +1,7 @@
 #!/bin/sh
 
 ps="$(ps aux | grep ' python /home/pi/repository/python/pvoutput/P1Update.py' | wc -l)"
-if [ $ps -eq 1 ]; then
+if [ $ps -eq 2 ]; then
 	echo "Daemon running, no action required"
 else
 	echo "Daemon not running, starting..."
