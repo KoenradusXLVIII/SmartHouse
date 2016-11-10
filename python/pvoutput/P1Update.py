@@ -22,8 +22,12 @@ OBIS = [
     ['Energy import [low]', '1-0:1.8.1','(\d-\d):(\d\.?)+\((\d{6}\.\d{3})\*kWh\)'],
     ['Energy import [high]', '1-0:1.8.2','(\d-\d):(\d\.?)+\((\d{6}\.\d{3})\*kWh\)'],
     ['Energy export [low]', '1-0:2.8.1','(\d-\d):(\d\.?)+\((\d{6}\.\d{3})\*kWh\)'],
-    ['Energy export [high]', '1-0:2.8.2','(\d-\d):(\d\.?)+\((\d{6}\.\d{3})\*kWh\)']
+    ['Energy export [high]', '1-0:2.8.2','(\d-\d):(\d\.?)+\((\d{6}\.\d{3})\*kWh\)'],
+    ['Solar generation', '0-1:24.2.1','(\d-\d):(\d\.?)+\((\d{5}\.\d{4})\*kWh\)']
 ]
+
+# Custom meter configuration
+custom_lines = 1
 
 # Script configuration
 output_path = '/home/pi/repository/python/pvoutput/input/'
@@ -68,6 +72,13 @@ def read_telegram():
         else:
             CRC_data += data_raw
 
+    # Read the custom lines
+    for line in range(0,custom_lines):
+        data_raw = str(ser.readline())
+        if(serial_to_terminal):
+            print(data_raw.strip())
+        data.append(data_raw.strip())
+
     # Check for options
     if (len(sys.argv) > 1):
         # Output data if verbose option
@@ -75,7 +86,7 @@ def read_telegram():
             print('[#] Data received: %s' % data)
 
     # Verify CRC
-    CRC_rec = data[len(data)-1]
+    CRC_rec = data[len(data)-1-custom_lines]
     CRC_data += '!'
     if(CRC_rec.startswith(eot_char)):
         CRC = hex(CRC16().calculate(CRC_data))
@@ -87,7 +98,7 @@ def read_telegram():
 
             # Parsa data and compute net energy usage
             energy = 0.0
-            for line in range (1,len(data)-1):
+            for line in range (1,len(data)):
                 for desc, ref, regex in OBIS:
                     if(data[line].startswith(ref)):
                         m = re.search(regex,data[line])
@@ -106,7 +117,7 @@ def read_telegram():
             itt = 0
             print('[#] CRC mismatch: 0x%s / 0x%s' % (CRC,CRC_rec))
 
-            for line in range (1,len(data)-1):
+            for line in range (1,len(data)):
                 for desc, ref, regex in OBIS:
                     if(data[line].startswith(ref)):
                         if (re.match(regex,data[line])) is None:

@@ -9,25 +9,34 @@
 // Arduino Mega      46        48       44, 45
 // Wiring-S           5         6          4
 // Sanguino          13        14         12
- 
+
+#define BUFSIZE 75
+
 AltSoftSerial altSerial;
 char c;
- 
+char buffer[BUFSIZE];
+int bufpos = 0;
+
 void setup() {
     Serial.begin(115200);
     altSerial.begin(115200);
     pinMode(2,OUTPUT);
     digitalWrite(2, HIGH);
 }
- 
+
 void loop() {
     if (altSerial.available()) {
         c = altSerial.read();
-   
-        // --- 7 bits instelling ---
-        c &= ~(1 << 7);
-        char inChar = (char)c;
- 
-    Serial.print(c);
+        buffer[bufpos] = c;
+        bufpos++;
+
+        if(c == '\n') { // End of line detected
+          Serial.print(buffer);
+          if(buffer[0] == '!') // End of telegram detected
+            Serial.println("0-1:24.2.1(01000.1234*kWh)");
+          for (int i=0; i<BUFSIZE; i++)
+            buffer[i] = 0;
+          bufpos = 0;
+        }
     }
 }
