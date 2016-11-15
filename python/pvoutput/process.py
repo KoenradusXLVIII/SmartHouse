@@ -95,7 +95,7 @@ power_generation = float(data['Power PV']) # v2
 # Energy data
 #energy_import = int((float(data['Energy import [low]']) + float(data['Energy import [high]']))*1000)
 #energy_export = int((float(data['Energy export [low]']) + float(data['Energy export [high]']))*1000)
-energy_net_consumption = power_export = int((float(data['Energy net']))*1000)
+energy_net_consumption = power_export = int(data['Energy net'])
 energy_generation = float(data['Energy PV']) # v1
 energy_consumption = energy_generation +  energy_net_consumption # v3
 
