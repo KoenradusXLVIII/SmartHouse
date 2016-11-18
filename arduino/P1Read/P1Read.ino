@@ -31,30 +31,30 @@ long cnt_d = 0;
 long E_import_low; // W
 long E_import_high; // W
 long E_export_low; // W
-long E_export_high; // W
+long E_export_high; // WdigitalWrite(6, HIGH);
 
 // S0 counter
 long E_PV = 0; // Wh
-int S0_prev_state = 0;
+int S0_prev_state = 1;
 int S0_pin = 7;
 
 void setup() {
   Serial.begin(115200);
   altSerial.begin(115200);
-  pinMode(S0_pin,INPUT);
+  pinMode(S0_pin,INPUT_PULLUP);
+  //pinMode(6, OUTPUT);
+  //digitalWrite(6, LOW);
   t_last = millis();
 }
 
 void S0_read(void) {
   int S0_cur_state = digitalRead(S0_pin);
 
-  if(S0_prev_state == 0)
+  if(S0_prev_state == 1)
   {
-    if (S0_cur_state)
+    if (S0_cur_state == 0)
     { // Start of pulse detected
       E_PV += 1;
-      Serial.print("E_PV: ");
-      Serial.println(E_PV);
     }
   }
 
@@ -75,10 +75,14 @@ void process_telegram(void) {
     if (((P_avg < P_max) && (P_avg > 0)) || (E_init < E_init_cnt)) { // Sample validated or initializing
       E_last = E_cur;
       t_last = t_cur;
-      if ((P_avg < P_max) && (P_avg > 0)) {  // Sample valid, exit initialization
+      if ((P_avg < P_max) && (P_avg > 0) && (E_init != E_init_cnt)) {  // Sample valid, exit initialization
         E_init = E_init_cnt;
-      } else {
+        Serial.println("[DEBUG] Initialization complete");
+      } else if (E_init != E_init_cnt) {
         E_init += 1;
+        Serial.print("[DEBUG] Initialization iteration ");
+        Serial.print(E_init);
+        Serial.print("\n");
       }
     }
   }
@@ -127,6 +131,8 @@ void decode_telegram(void) {
         if(E_init == E_init_cnt) {
           Serial.print("E_net: ");
           Serial.println(E_last);
+          Serial.print("E_PV: ");
+          Serial.println(E_PV);
         }
       }
 
@@ -134,7 +140,13 @@ void decode_telegram(void) {
       for (int i=0; i<BUFSIZE; i++)
         buffer[i] = 0;
       bufpos = 0;
+    }
 
+    if (bufpos == BUFSIZE) {
+      // Flush buffer
+      for (int i=0; i<BUFSIZE; i++)
+        buffer[i] = 0;
+      bufpos = 0;
     }
   }
 }
