@@ -15,7 +15,7 @@ ser = serial.Serial(port, baudrate)
 
 # Script configuration
 output_path = '/home/pi/repository/python/pvoutput/input/'
-maximum_age = 180 # seconds
+maximum_age = 60 # seconds
 serial_to_terminal = False
 
 def write_to_file(file,header,data):

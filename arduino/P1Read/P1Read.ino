@@ -17,6 +17,7 @@ int bufpos = 0;
 
 // P1 telegram
 float P_max = 5000.0; // W
+float P_min = -2200.0; // W
 float P_avg; // W
 long E_last = 0; // Wh
 long E_cur = 0; // Wh
@@ -72,10 +73,10 @@ void process_telegram(void) {
     t_delta_hour = (float) t_delta/(1000.0*60.0*60.0); // hours
 
     P_avg = ((float) E_cur - (float) E_last) / t_delta_hour; // W
-    if (((P_avg < P_max) && (P_avg > 0)) || (E_init < E_init_cnt)) { // Sample validated or initializing
+    if (((P_avg < P_max) && (P_avg > P_min)) || (E_init < E_init_cnt)) { // Sample validated or initializing
       E_last = E_cur;
       t_last = t_cur;
-      if ((P_avg < P_max) && (P_avg > 0) && (E_init != E_init_cnt)) {  // Sample valid, exit initialization
+      if ((P_avg < P_max) && (P_avg > P_min) && (E_init != E_init_cnt)) {  // Sample valid, exit initialization
         E_init = E_init_cnt;
         Serial.println("[DEBUG] Initialization complete");
       } else if (E_init != E_init_cnt) {
