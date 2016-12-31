@@ -13,7 +13,7 @@
 */
 
 void setup() {
-  Serial.begin(9600);        // connect to the serial port
+  Serial.begin(115200);        // connect to the serial port
 }
 
 void loop () {

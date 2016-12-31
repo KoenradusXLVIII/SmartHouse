@@ -3,4 +3,6 @@ shell/tmp/
 python/pvoutput/input/
 python/pvoutput/output/
 arduino/P1Read/build-uno/
+arduino/SerialBlink/build-uno/
+arduino/P1Debug/build-uno/
 *.log
