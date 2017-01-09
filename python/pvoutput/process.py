@@ -1,18 +1,17 @@
-#from influxdb import InfluxDBClient
-import os
 import logging
-import sys
-import csv
+import logging.handlers
 import requests
 import datetime
 import time
 import serial
+import re
 
 # Script variables
 verbose = False
-logging = False
 base_path = '/home/pi/repository/python/pvoutput/'
 logfile = base_path + 'output.log'
+log_level = logging.INFO
+interval = 300 # seconds
 
 # Serial port configuration
 port = '/dev/ttyACM0'
@@ -25,63 +24,77 @@ pvoutput_sid="47507"
 pvoutput_url="http://pvoutput.org/service/r2/addstatus.jsp"
 
 # Configure logging
-if(logging):
-    logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s', level=logging.DEBUG, datefmt='%Y-%m-%d %H:%M:%S', filename=logfile)
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
+logger = logging.getLogger('PVOutput_Logger')
+logger.setLevel(log_level)
+# Add handler to the logger
+handler = logging.handlers.SysLogHandler('/dev/log')
+# Add syslog format to the handler
+formatter = logging.Formatter('Python: { "loggerName":"%(name)s", "asciTime":"%(asctime)s", "pathName":"%(pathname)s", "logRecordCreationTime":"%(created)f", "functionName":"%(funcName)s", "levelNo":"%(levelno)s", "lineNo":"%(lineno)d", "time":"%(msecs)d", "levelName":"%(levelname)s", "message":"%(message)s"}')
+handler.formatter = formatter
+logger.addHandler(handler)
 
+# Initialize variables
+regex = 'E_(net|PV): (\d{1,})'
+start_time = 0
 
-#
-# Read data from Arduino
-#
+while(True):
+    # Initialize Arduino variables
+    E_net = -1
+    E_PV = -1
 
-E_net = -1
-E_PV = -1
+    # Wait to receive two valid values
+    while ((E_net < 0) or (E_PV < 0)):
+        # Read serial data
+        data_raw = str(ser.readline())
+        data_raw = data_raw.strip()
+        if(verbose):
+            print(data_raw)
 
-while ((E_net < 0) or (E_PV < 0)):
-    # Read serial data
-    data_raw = str(ser.readline());
-    data_raw = data_raw.strip();
+        # Validate data
+        m = re.search(regex,data_raw)
+        if(m):
+            if(m.group(1) == 'net'):
+                E_net = int(m.group(2))
+            if(m.group(1) == 'PV'):
+                E_PV =  int(m.group(2)) # v1
+        else:
+            logger.warning('Received invalid data: %s' % data_raw)
+    E_cons = E_PV + E_net # v3
+
+    # Prepare PVOutput headers
+    headers = {
+        'X-Pvoutput-Apikey': pvoutput_key,
+        'X-Pvoutput-SystemId' : pvoutput_sid
+    }
+
+    # Prepare data
+    date_str = datetime.datetime.today().strftime('%Y%m%d')
+    time_str = datetime.datetime.today().strftime('%H:%M')
+
     if(verbose):
-        print(data_raw)
-    if(data_raw.startswith("E_net")):
-        data_array = data_raw.split()
-        #print('Energy net: %s' % data_array[1])
-        E_net = int(data_array[1])
-    if(data_raw.startswith("E_PV")):
-        data_array = data_raw.split()
-        #print('Energy PV: %s' % data_array[1])
-        # Write value to file
-        E_PV = int(data_array[1]) # v1
+        print 'Date: %s' % date_str
+        print 'Time: %s' % time_str
+        print 'Energy Generation: %s Wh' % E_PV
+        print 'Energy Net Import: %s Wh' % E_net
+        print 'Energy Consumption: %s Wh' % E_cons
 
-#
-# Upload to PVOutput
-#
+    # Prepare API data
+    pvoutput_energy = pvoutput_url + '?d=%s&t=%s&v1=%s&v3=%s&c1=1' % (date_str,time_str,E_PV,E_cons)
+    if(verbose):
+        print pvoutput_energy
 
-# Prepare headers
-headers = {
-    'X-Pvoutput-Apikey': pvoutput_key,
-    'X-Pvoutput-SystemId' : pvoutput_sid
-}
+    # Post API data every 5 minutes
+    elapsed_time = time.time() - start_time
+    if(elapsed_time >= interval):
+        start_time = time.time()
 
-# Prepare data
-date = datetime.datetime.today().strftime('%Y%m%d')
-time = datetime.datetime.today().strftime('%H:%M')
+        # Upload
+        r = requests.post(pvoutput_energy,headers=headers)
 
-E_cons = E_PV + E_net # v3
-
-print 'Date: %s' % date
-print 'Time: %s' % time
-print 'Energy Generation: %s Wh' % E_PV
-print 'Energy Consumption: %s Wh' % E_cons
-if(logging):
-    logging.info('Energy Generation: %s; Energy Consumption: %s' % (E_PV,E_cons))
-
-# Prepare API data
-pvoutput_energy = pvoutput_url + '?d=%s&t=%s&v1=%s&v3=%s&c1=1' % (date,time,E_PV,E_cons)
-if(verbose):
-    print pvoutput_energy
-
-# Post API data
-r = requests.post(pvoutput_energy,headers=headers)
-if(logging):
-    logging.info('Energy data upload: %s' % r.content)
+        # logging
+        logger.debug('Data received from Arduino: %s' % data_raw)
+        logger.info('Energy Generation: %s; Energy Net Consumption: %s; Energy Consumption: %s' % (E_PV,E_net,E_cons))
+        logger.info('Energy data upload: %s' % r.content)
+    else:
+        if(verbose):
+            print 'Time to wait: %d seconds' % (interval-elapsed_time)
