@@ -5,6 +5,8 @@ import datetime
 import time
 import serial
 import re
+import urllib
+import json
 
 # Script variables
 verbose = False
@@ -17,6 +19,9 @@ interval = 300 # seconds
 port = '/dev/ttyACM0'
 baudrate = '115200'
 ser = serial.Serial(port, baudrate)
+
+# Guardhouse configuration
+url = "http://192.168.1.112/"
 
 # PVOutput variables
 pvoutput_key="d1b62a7d17dbebf167b98df9eb2f7c2188438d78"
@@ -61,6 +66,10 @@ while(True):
             logger.warning('Received invalid data: %s' % data_raw)
     E_cons = E_PV + E_net # v3
 
+    # Get extended data
+    response = urllib.urlopen(url)
+    data_json = json.loads(response.read())
+
     # Prepare PVOutput headers
     headers = {
         'X-Pvoutput-Apikey': pvoutput_key,
@@ -77,9 +86,11 @@ while(True):
         print 'Energy Generation: %s Wh' % E_PV
         print 'Energy Net Import: %s Wh' % E_net
         print 'Energy Consumption: %s Wh' % E_cons
+        print 'Temperature: %s' % data_json['Temperature']
+        print 'Humidity: %s' % data_json['Humidity']
 
     # Prepare API data
-    pvoutput_energy = pvoutput_url + '?d=%s&t=%s&v1=%s&v3=%s&c1=1' % (date_str,time_str,E_PV,E_cons)
+    pvoutput_energy = pvoutput_url + '?d=%s&t=%s&v1=%s&v3=%s&v7=%s&v8=%s&c1=1' % (date_str,time_str,E_PV,E_cons,data_json['Temperature'],data_json['Humidity'])
     if(verbose):
         print pvoutput_energy
 

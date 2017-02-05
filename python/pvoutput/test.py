@@ -1,8 +1,10 @@
-import os
-import time
-import sys
+import urllib
+import json
 
-st = os.stat('test.py')
-age = (time.time()-st.st_mtime)
-print age
-print sys.argv[1]
+url = "http://192.168.1.112/"
+response = urllib.urlopen(url)
+data = json.loads(response.read())
+
+print data
+print data['Temperature']
+print data['Humidity']
