@@ -21,7 +21,7 @@ baudrate = '115200'
 ser = serial.Serial(port, baudrate)
 
 # Guardhouse configuration
-url = "http://192.168.1.112/"
+guardhouse_url = "http://192.168.1.112/all"
 
 # PVOutput variables
 pvoutput_key="d1b62a7d17dbebf167b98df9eb2f7c2188438d78"
@@ -67,7 +67,7 @@ while(True):
     E_cons = E_PV + E_net # v3
 
     # Get extended data
-    response = urllib.urlopen(url)
+    response = urllib.urlopen(guardhouse_url)
     data_json = json.loads(response.read())
 
     # Prepare PVOutput headers
