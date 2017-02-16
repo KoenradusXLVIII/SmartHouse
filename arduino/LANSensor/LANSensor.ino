@@ -12,6 +12,8 @@ Ethernet shield attached to pins 10, 11, 12, 13
 #define BUFFER 64
 #define CLOSED 0
 #define OPEN 1
+#define TEMP 0
+#define HUMI 1
 
 // Enter a MAC address and IP address for your controller below.
 // The IP address will be dependent on your local network:
@@ -25,16 +27,18 @@ IPAddress ip(192, 168, 1, 112);
 // (port 80 is default for HTTP):
 EthernetServer server(80);
 
-// DHT sensor
-dht DHT;
-float buf_temp[BUFFER];
-float buf_humi[BUFFER];
-// Digital I/O variables
-int cur_door_state = CLOSED;    // Default to closed
-int prev_door_state = CLOSED;   // Default to closed
-unsigned long close_time;
-bool timer_on = false;          // Default timer off
-int LightDelay = 30; // seconds
+// Define variables
+  // DHT sensor
+  dht DHT;
+  float buf_temp[BUFFER];
+  float buf_humi[BUFFER];
+  // Digital I/O variables
+  int cur_door_state = CLOSED;    // Default to closed
+  int prev_door_state = CLOSED;   // Default to closed
+  int light_state = LOW;          // Default to light off
+  unsigned long close_time;
+  bool timer_on = false;          // Default timer off
+  int light_delay = 30;            // UOM: seconds
 
 void setup() {
   // Open serial communications and wait for port to open:
@@ -73,9 +77,9 @@ void loop() {
     // Ethernet variables
       String command;
     
-  // Get new filtered DHT21 values [0 = temp, 1 = humi]
-  temp = read_filtered_DHT(buf_temp,0);
-  humi = read_filtered_DHT(buf_humi,1); 
+  // Get new filtered DHT21 values
+  temp = read_filtered_DHT(buf_temp,TEMP);
+  humi = read_filtered_DHT(buf_humi,HUMI); 
 
   // Process digital I/0
   cur_door_state = digitalRead(DOOR_CONTACT_PIN);
@@ -86,15 +90,17 @@ void loop() {
   } else if ((prev_door_state == CLOSED) and (cur_door_state == CLOSED)) {
     // Door was closed and is closed
     if(timer_on) {
-      if ((millis() - close_time) > (LightDelay * 1000)) {
+      if ((millis() - close_time) > (light_delay * 1000)) {
         // Timer has expired, turn light off
         digitalWrite(LIGHT_RELAY_PIN, LOW);
+        light_state = LOW;
         timer_on = false;
       }
     }
   } else { // cur_door_state == OPEN
     // Door is open, turn light on
     digitalWrite(LIGHT_RELAY_PIN, HIGH);
+    light_state = HIGH;
   }  
   prev_door_state = cur_door_state;
   
@@ -160,8 +166,10 @@ void loop() {
               client.print(humi);
               client.print(", \"Door state\":");
               client.print(cur_door_state);
+              client.print(", \"Light state\":");
+              client.print(light_state);
               client.print(", \"Light delay\":");
-              client.print(LightDelay);
+              client.print(light_delay);
               client.println("}");
             } else if (command == "door_state") {
               client.println("HTTP/1.1 200 OK");      
@@ -193,7 +201,15 @@ void loop() {
               client.println("Connection: close");      
               client.println();
               client.print("{\"Light delay\":");
-              client.print(LightDelay);
+              client.print(light_delay);
+              client.println("}");
+            } else if (command == "light_state") {
+              client.println("HTTP/1.1 200 OK");      
+              client.println("Content-Type: text/json");
+              client.println("Connection: close");      
+              client.println();
+              client.print("{\"Light state\":");
+              client.print(light_state);
               client.println("}");
             } else {
               // Unknown variable
@@ -207,7 +223,7 @@ void loop() {
           if (cmd_type == 'S'){
             if (command == "light_delay") {
               if(cmd_value.toInt()) {
-                LightDelay = cmd_value.toInt();
+                light_delay = cmd_value.toInt();
                 
                 // Inform client
                 client.println("HTTP/1.1 200 OK");      
@@ -215,7 +231,7 @@ void loop() {
                 client.println("Connection: close");      
                 client.println();
                 client.print("{\"Light delay\":");
-                client.print(LightDelay);
+                client.print(light_delay);
                 client.println("}");
               } else {
                 // Invalid SET parameter received
@@ -306,57 +322,3 @@ float read_filtered_DHT(float *buf_data, int sensor) {
   }
   return float(sum / len);
 }
-
-/*
-void read_DHT() {
-  // Read new sensor reading, append to buffer and delete oldest reading
-  DHT.read21(DHT21_PIN);
-  for (int n = (BUFFER - 1); n > 0; n--) {
-    buf_temp[n] = buf_temp[n - 1];
-    buf_humi[n] = buf_humi[n - 1];    
-  }
-  buf_temp[0] = DHT.temperature;
-  buf_humi[0] = DHT.humidity;
-  
-  float tempsum = 0;
-  float humisum = 0;
-  float tempdiff = 0;
-  float humidiff = 0;
-
-  // Compute mean and standard deviation
-  for (int n = 0; n < BUFFER; n++) {
-    tempsum += buf_temp[n];
-    humisum += buf_humi[n];
-  }
-  float tempmean = float(tempsum / BUFFER);
-  float humimean = float(humisum / BUFFER);
-  for (int n = 0; n < BUFFER; n++) {
-    tempdiff += ((buf_temp[n] - tempmean) * (buf_temp[n] - tempmean));
-    humidiff += ((buf_humi[n] - humimean) * (buf_humi[n] - humimean));
-  }
-  float tempsd = sqrt(tempdiff / (BUFFER - 1));
-  float humisd = sqrt(humidiff / (BUFFER - 1));
-
-  // Recompute mean, while excluding samples removed 
-  // further then one standard deviation from the mean
-  float newtempsum = 0;
-  float newtemplen = 0;
-  for (int n = 0; n < BUFFER; n++) {
-    if((buf_temp[n] <= (tempmean + tempsd)) and (buf_temp[n] >= (tempmean - tempsd))) {
-      newtempsum += buf_temp[n];
-      newtemplen++;
-    }
-  }
-  temp = newtempsum / newtemplen;
-  
-  float newhumisum = 0;
-  float newhumilen = 0;
-  for (int n = 0; n < BUFFER; n++) {
-    if((buf_humi[n] <= (humimean + humisd)) and (buf_humi[n] >= (humimean - humisd))) {
-        newhumisum += buf_humi[n];
-        newhumilen++;
-    }
-  }
-  humi = newhumisum / newhumilen;
-}
-*/
