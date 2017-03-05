@@ -1,7 +1,7 @@
 import serial
 
 # Serial port configuration
-port = '/dev/ttyACM0'
+port = '/dev/ttyUSB0'
 baudrate = '115200'
 
 # Initialize variables

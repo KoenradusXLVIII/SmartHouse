@@ -6,7 +6,7 @@ import csv
 import time
 
 # Serial port configuration
-port = '/dev/ttyACM0'
+port = '/dev/ttyUSB0'
 baudrate = '115200'
 
 # Smart meter configuration
@@ -108,6 +108,7 @@ while ((time.time()-start_time) < timeout):
         print('[#] Valid message received after %d retries' % (itt+1))
 
         # Write to CSV
+        '''
         f = open(output_path + 'P1.csv','wt')
         writer = csv.writer(f)
         # Write header
@@ -117,17 +118,18 @@ while ((time.time()-start_time) < timeout):
         writer.writerow(header)
 
         data_CSV = []
+        '''
         for line in range (1,len(data)-1):
             for desc, ref, regex in OBIS:
                 if(data[line].startswith(ref)):
                     m = re.search(regex,data[line])
                     print('[#] %s: %s' % (desc,m.group(3)))
-                    data_CSV.append(m.group(3))
+                    #data_CSV.append(m.group(3))
         # Write data
-        writer.writerow(data_CSV)
+        #writer.writerow(data_CSV)
 
         # Close CSV file
-        f.close
+        #f.close
         sys.exit()
     else:
         itt += 1
