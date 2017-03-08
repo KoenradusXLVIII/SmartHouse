@@ -144,7 +144,12 @@ def main():
     logging.info('=== START OF SESSION ===')
 
     # Get solar data
-    E_PV = 0
+    try:
+        response = urllib.urlopen(mainhouse_url)
+    except:
+        logging.error('No data received from Main House')
+    data_json = json.loads(response.read())
+    E_PV = data_json['PV']
 
     # Get P1 data
     E_net = -1

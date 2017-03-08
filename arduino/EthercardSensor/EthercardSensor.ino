@@ -108,8 +108,10 @@ void loop() {
             else if(cnt == 2) {
               Serial.println("Invalid command");
               // Invalid command received
-              //client.println("HTTP/1.1 400 Invalid command");
-              //client.println("Connection: close");
+              bfill.emit_p(PSTR(
+              "HTTP/1.0 400 Invalid command\r\n"
+              "Connection: close\r\n"));
+              ether.httpServerReply(bfill.position());             
               break;
             }
           }
@@ -132,6 +134,10 @@ void loop() {
             "Connection: close\r\n"
             "\r\n"
             "{\"PV\": $L}"),E_PV);     
+          } else {
+            bfill.emit_p(PSTR(
+            "HTTP/1.0 400 Unknown variable\r\n"
+            "Connection: close\r\n"));  
           }
         }
 
@@ -160,198 +166,4 @@ void loop() {
       }
     } 
   }
-  /*
-  // Processe ethernet clients
-  EthernetClient client = server.available();
-  if (client) {
-    String readline;
-    String command;
-
-    //Serial.print("Handling new incoming request... ");
-    // an http request ends with a blank line
-    boolean currentLineIsBlank = true;
-    while (client.connected()) {
-      if (client.available()) {
-        char c = client.read();
-        //Serial.write(c);
-
-        // Store the HTTP request line
-        if (readline.length() < 100) {
-          readline += c;
-        }
-
-        // if you've gotten to the end of the line (received a newline
-        // character) and the line is blank, the http request has ended,
-        // so you can send a reply
-        if (c == '\n' && currentLineIsBlank) {
-          // Parsing command
-          char cmd_type = 'G';  // Default to GET command
-          String cmd_value;
-          int cnt = 0;
-
-          for (int i = 0; i < command.length(); i++ ){
-            if (command.charAt(i) == '/') {
-              cnt++;
-              if (cnt == 1) {
-                // SET command received, strip remaining characters
-                cmd_type = 'S';
-                cmd_value = command;
-                cmd_value.remove(0,i+1);
-                command.remove(i);
-              }
-              else if(cnt == 2) {
-                Serial.println("Invalid command");
-                // Invalid command received
-                client.println("HTTP/1.1 400 Invalid command");
-                client.println("Connection: close");
-                break;
-              }
-            }
-          }
-
-          // If a GET command is received execute
-          // the request if the variable is known
-          if (cmd_type == 'G'){
-            if (command == "all") {
-              client.println("HTTP/1.1 200 OK");
-              client.println("Content-Type: text/json");
-              client.println("Connection: close");
-              client.println();
-              client.print("{\"Temperature\":");
-              client.print(temp);
-              client.print(", \"Humidity\":");
-              client.print(humi);
-              client.print(", \"Door state\":");
-              client.print(cur_door_state);
-              client.print(", \"Light state\":");
-              client.print(light_state);
-              client.print(", \"Light delay\":");
-              client.print(light_delay);
-              client.println("}");
-            } else if (command == "door_state") {
-              client.println("HTTP/1.1 200 OK");
-              client.println("Content-Type: text/json");
-              client.println("Connection: close");
-              client.println();
-              client.print("{\"Door state\":");
-              client.print(cur_door_state);
-              client.println("}");
-            } else if (command == "temp") {
-              client.println("HTTP/1.1 200 OK");
-              client.println("Content-Type: text/json");
-              client.println("Connection: close");
-              client.println();
-              client.print("{\"Temperature\":");
-              client.print(temp);
-              client.println("}");
-            } else if (command == "humi") {
-              client.println("HTTP/1.1 200 OK");
-              client.println("Content-Type: text/json");
-              client.println("Connection: close");
-              client.println();
-              client.print("{\"Humidity\":");
-              client.print(humi);
-              client.println("}");
-            } else if (command == "light_delay") {
-              client.println("HTTP/1.1 200 OK");
-              client.println("Content-Type: text/json");
-              client.println("Connection: close");
-              client.println();
-              client.print("{\"Light delay\":");
-              client.print(light_delay);
-              client.println("}");
-            } else if (command == "light_state") {
-              client.println("HTTP/1.1 200 OK");
-              client.println("Content-Type: text/json");
-              client.println("Connection: close");
-              client.println();
-              client.print("{\"Light state\":");
-              client.print(light_state);
-              client.println("}");
-            } else {
-              // Unknown variable
-              client.println("HTTP/1.1 400 Unkown variable");
-              client.println("Connection: close");
-            }
-          }
-
-          // If a SET command is received execute
-          // the request if the variable is known
-          if (cmd_type == 'S'){
-            if (command == "light_delay") {
-              if(cmd_value.toInt()) {
-                light_delay = cmd_value.toInt();
-
-                // Inform client
-                client.println("HTTP/1.1 200 OK");
-                client.println("Content-Type: text/json");
-                client.println("Connection: close");
-                client.println();
-                client.print("{\"Light delay\":");
-                client.print(light_delay);
-                client.println("}");
-              } else {
-                // Invalid SET parameter received
-                client.println("HTTP/1.1 400 Invalid parameter");
-                client.println("Connection: close");
-              }
-            } else if (command == "light_state") {
-              if(cmd_value.toInt()) {
-                if(cmd_value) {
-                  // Turn light on
-                  digitalWrite(LIGHT_RELAY_PIN, HIGH);
-                  light_state = HIGH;
-                } else {
-                  // Turn light off
-                  digitalWrite(LIGHT_RELAY_PIN, LOW);
-                  light_state = LOW;
-                }
-
-                // Inform client
-                client.println("HTTP/1.1 200 OK");
-                client.println("Content-Type: text/json");
-                client.println("Connection: close");
-                client.println();
-                client.print("{\"Light state\":");
-                client.print(light_state);
-                client.println("}");
-              } else {
-                // Invalid SET parameter received
-                client.println("HTTP/1.1 400 Invalid parameter");
-                client.println("Connection: close");
-              }
-            } else {
-              // Unknown variable
-              client.println("HTTP/1.1 400 Unkown variable");
-              client.println("Connection: close");
-            }
-          }
-          break;
-        }
-
-        // EOL character received
-        if (c == '\n') {
-          //Serial.println(readline);
-          if (readline.startsWith("GET")) {
-            // GET command received, stripping...
-            command = readline;
-            command.remove(0, 5);  // Strip "GET /"
-            command.remove(command.length()-11);      // Strip " HTTP/1.1"
-          }
-          readline = "";
-          currentLineIsBlank = true;
-
-        // Carriage Return received
-        } else if (c != '\r') {
-          // you've gotten a character on the current line
-          currentLineIsBlank = false;
-        }
-      }
-    }
-    // give the web browser time to receive the data
-    delay(1);
-    // close the connection:
-    client.stop();
-    Serial.println("[DONE]");
-  }*/
 }
