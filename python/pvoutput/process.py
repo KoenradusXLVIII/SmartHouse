@@ -111,7 +111,7 @@ def read_telegram():
     CRC_rec = data[len(data)-1]
     CRC_data += '!'
     if(CRC_rec.startswith(eot_char)):
-        CRC = hex(CRC16().calculate(CRC_data))
+        CRC = "0x{:04x}".format(CRC16().calculate(CRC_data))
         CRC = CRC[2:].upper()
         CRC_rec = CRC_rec[1:] # Remove '!' for displayed CRC
 
@@ -143,13 +143,16 @@ def main():
     # Start new session
     logging.info('=== START OF SESSION ===')
 
-    # Get solar data
+    # Get solar and water data
     try:
         response = urllib.urlopen(mainhouse_url)
+        data_json = json.loads(response.read())
+        E_PV = data_json['E_PV']
+        P_PV = data_json['P_PV']
+        H2O = data_json['H2O']
     except:
         logging.error('No data received from Main House')
-    data_json = json.loads(response.read())
-    E_PV = data_json['PV']
+        E_PV = 0
 
     # Get P1 data
     E_net = -1
@@ -168,9 +171,17 @@ def main():
     # Get extended data
     try:
         response = urllib.urlopen(guardhouse_url)
+        data_json = json.loads(response.read())
+        temp = data_json['Temperature']
+        humi = data_json['Humidity']
+        #door = data_json['Door state']
+        #light = data_json['Light state']
     except:
         logging.error('No data received from GuardHouse')
-    data_json = json.loads(response.read())
+        temp = 0
+        humi = 0
+        #door = 0
+        #light = 0
 
     #  Prepare PVOutput headers
     headers = {
@@ -185,14 +196,20 @@ def main():
     # Logging data
     logging.debug('Date: %s' % date_str)
     logging.debug('Time: %s' % time_str)
+    logging.info('Power Generation: %s W' % P_PV)
     logging.info('Energy Generation: %s Wh' % E_PV)
     logging.info('Energy Net Import: %s Wh' % E_net)
     logging.info('Energy Consumption: %s Wh' % E_cons)
-    logging.info('Temperature: %s' % data_json['Temperature'])
-    logging.info('Humidity: %s' % data_json['Humidity'])
+    logging.info('Water Consumption: %s liter' % H2O)
+    logging.info('Temperature: %s' % temp)
+    logging.info('Humidity: %s' % humi)
+
+    #logging.info('Door State: Open' if(door) else 'Door State: Closed')
+    #logging.info('Light State: On' if(door) else 'Light State: Off')
 
     # Prepare API data
-    pvoutput_energy = pvoutput_url + '?d=%s&t=%s&v1=%s&v3=%s&v7=%s&v8=%s&c1=1' % (date_str,time_str,E_PV,E_cons,data_json['Temperature'],data_json['Humidity'])
+    pvoutput_energy = pvoutput_url + '?d=%s&t=%s&v1=%s&v3=%s&v7=%s&v8=%s&v9=%s&c1=1' % (date_str,time_str,E_PV,E_cons,temp,humi,H2O)
+    #pvoutput_energy = pvoutput_url + '?d=%s&t=%s&v1=%s&v2=%s&v3=%s&v7=%s&v8=%s&v9=%s&c1=1' % (date_str,time_str,E_PV,P_PV,E_cons,temp,humi,H2O)
     logging.debug('Request: %s' % pvoutput_energy)
 
     # Upload

@@ -14,6 +14,7 @@ Ethernet shield attached to pins 10, 11, 12, 13
 #define OPEN 1
 #define TEMP 0
 #define HUMI 1
+#define LIGHT_SENSOR_PIN 0
 
 // Enter a MAC address and IP address for your controller below.
 // The IP address will be dependent on your local network:
@@ -38,7 +39,11 @@ EthernetServer server(80);
   int light_state = LOW;          // Default to light off
   unsigned long close_time;
   bool timer_on = false;          // Default timer off
-  int light_delay = 30;            // UOM: seconds
+  int light_delay = 30;           // UOM: seconds
+
+  // Light sensor
+  int light_intensity = 0;        // Default to darkness
+  int light_thresh = 512;         // 4.9mV per LSB, 0-5V 
 
 void setup() {
   // Open serial communications and wait for port to open:
@@ -53,20 +58,20 @@ void setup() {
 
   // start the Ethernet connection and the server:
   Ethernet.begin(mac, ip);
-  Serial.print("Starting ethernet host...");
+  Serial.print(F("Starting ethernet host..."));
   server.begin();
-  Serial.println("[DONE]");
-  Serial.print("LANSensor IP: ");
+  Serial.println(F("[DONE]"));
+  Serial.print(F("LANSensor IP: "));
   Serial.println(Ethernet.localIP());
 
   // Fill buffer with initial data
-  Serial.print("Initializing measurement buffer...");
+  Serial.print(F("Initializing measurement buffer..."));
   for (int n = 0; n < BUFFER; n++) {
     DHT.read21(DHT21_PIN);
     buf_temp[n] = DHT.temperature;
     buf_humi[n] = DHT.humidity;
   }
-  Serial.println("[DONE]");
+  Serial.println(F("[DONE]"));
 }
 
 void loop() {
@@ -80,6 +85,9 @@ void loop() {
   // Get new filtered DHT21 values
   temp = read_filtered_DHT(buf_temp,TEMP);
   humi = read_filtered_DHT(buf_humi,HUMI);
+
+  // Sample analog I/O
+  light_intensity = analogRead(LIGHT_SENSOR_PIN);
 
   // Process digital I/0
   cur_door_state = digitalRead(DOOR_CONTACT_PIN);
@@ -98,9 +106,12 @@ void loop() {
       }
     }
   } else { // cur_door_state == OPEN
-    // Door is open, turn light on
-    digitalWrite(LIGHT_RELAY_PIN, HIGH);
-    light_state = HIGH;
+    // Door is open, ...
+    if(light_intensity < light_thresh) {
+      // ... and it is dark, turn light on.
+      digitalWrite(LIGHT_RELAY_PIN, HIGH);
+      light_state = HIGH;
+    }
   }
   prev_door_state = cur_door_state;
 
@@ -143,10 +154,10 @@ void loop() {
                 command.remove(i);
               }
               else if(cnt == 2) {
-                Serial.println("Invalid command");
+                Serial.println(F("Invalid command"));
                 // Invalid command received
-                client.println("HTTP/1.1 400 Invalid command");
-                client.println("Connection: close");
+                client.println(F("HTTP/1.1 400 Invalid command"));
+                client.println(F("Connection: close"));
                 break;
               }
             }
@@ -156,65 +167,85 @@ void loop() {
           // the request if the variable is known
           if (cmd_type == 'G'){
             if (command == "all") {
-              client.println("HTTP/1.1 200 OK");
-              client.println("Content-Type: text/json");
-              client.println("Connection: close");
+              client.println(F("HTTP/1.1 200 OK"));
+              client.println(F("Content-Type: text/json"));
+              client.println(F("Connection: close"));
               client.println();
-              client.print("{\"Temperature\":");
+              client.print(F("{\"Temperature\":"));
               client.print(temp);
-              client.print(", \"Humidity\":");
+              client.print(F(", \"Humidity\":"));
               client.print(humi);
-              client.print(", \"Door state\":");
+              client.print(F(", \"Door state\":"));
               client.print(cur_door_state);
-              client.print(", \"Light state\":");
+              client.print(F(", \"Light state\":"));
               client.print(light_state);
-              client.print(", \"Light delay\":");
+              client.print(F(", \"Light delay\":"));
               client.print(light_delay);
-              client.println("}");
+              client.print(F(", \"Light intensity\":"));
+              client.print(light_intensity);
+              client.print(F(", \"Light threshold\":"));
+              client.print(light_thresh);
+              client.println(F("}"));
             } else if (command == "door_state") {
-              client.println("HTTP/1.1 200 OK");
-              client.println("Content-Type: text/json");
-              client.println("Connection: close");
+              client.println(F("HTTP/1.1 200 OK"));
+              client.println(F("Content-Type: text/json"));
+              client.println(F("Connection: close"));
               client.println();
-              client.print("{\"Door state\":");
+              client.print(F("{\"Door state\":"));
               client.print(cur_door_state);
-              client.println("}");
+              client.println(F("}"));
             } else if (command == "temp") {
-              client.println("HTTP/1.1 200 OK");
-              client.println("Content-Type: text/json");
-              client.println("Connection: close");
+              client.println(F("HTTP/1.1 200 OK"));
+              client.println(F("Content-Type: text/json"));
+              client.println(F("Connection: close"));
               client.println();
-              client.print("{\"Temperature\":");
+              client.print(F("{\"Temperature\":"));
               client.print(temp);
-              client.println("}");
+              client.println(F("}"));
             } else if (command == "humi") {
-              client.println("HTTP/1.1 200 OK");
-              client.println("Content-Type: text/json");
-              client.println("Connection: close");
+              client.println(F("HTTP/1.1 200 OK"));
+              client.println(F("Content-Type: text/json"));
+              client.println(F("Connection: close"));
               client.println();
-              client.print("{\"Humidity\":");
+              client.print(F("{\"Humidity\":"));
               client.print(humi);
-              client.println("}");
+              client.println(F("}"));
             } else if (command == "light_delay") {
-              client.println("HTTP/1.1 200 OK");
-              client.println("Content-Type: text/json");
-              client.println("Connection: close");
+              client.println(F("HTTP/1.1 200 OK"));
+              client.println(F("Content-Type: text/json"));
+              client.println(F("Connection: close"));
               client.println();
-              client.print("{\"Light delay\":");
+              client.print(F("{\"Light delay\":"));
               client.print(light_delay);
-              client.println("}");
+              client.println(F("}"));
             } else if (command == "light_state") {
-              client.println("HTTP/1.1 200 OK");
-              client.println("Content-Type: text/json");
-              client.println("Connection: close");
+              client.println(F("HTTP/1.1 200 OK"));
+              client.println(F("Content-Type: text/json"));
+              client.println(F("Connection: close"));
               client.println();
-              client.print("{\"Light state\":");
+              client.print(F("{\"Light state\":"));
               client.print(light_state);
-              client.println("}");
+              client.println(F("}"));
+            } else if (command == "light_intensity") {
+              client.println(F("HTTP/1.1 200 OK"));
+              client.println(F("Content-Type: text/json"));
+              client.println(F("Connection: close"));
+              client.println();
+              client.print(F("{\"Light intensity\":"));
+              client.print(light_intensity);
+              client.println(F("}"));
+            } else if (command == "light_thresh") {
+              client.println(F("HTTP/1.1 200 OK"));
+              client.println(F("Content-Type: text/json"));
+              client.println(F("Connection: close"));
+              client.println();
+              client.print(F("{\"Light threshold\":"));
+              client.print(light_thresh);
+              client.println(F("}"));
             } else {
               // Unknown variable
-              client.println("HTTP/1.1 400 Unkown variable");
-              client.println("Connection: close");
+              client.println(F("HTTP/1.1 400 Unkown variable"));
+              client.println(F("Connection: close"));
             }
           }
 
@@ -226,17 +257,34 @@ void loop() {
                 light_delay = cmd_value.toInt();
 
                 // Inform client
-                client.println("HTTP/1.1 200 OK");
-                client.println("Content-Type: text/json");
-                client.println("Connection: close");
+                client.println(F("HTTP/1.1 200 OK"));
+                client.println(F("Content-Type: text/json"));
+                client.println(F("Connection: close"));
                 client.println();
-                client.print("{\"Light delay\":");
+                client.print(F("{\"Light delay\":"));
                 client.print(light_delay);
-                client.println("}");
+                client.println(F("}"));
               } else {
                 // Invalid SET parameter received
-                client.println("HTTP/1.1 400 Invalid parameter");
-                client.println("Connection: close");
+                client.println(F("HTTP/1.1 400 Invalid parameter"));
+                client.println(F("Connection: close"));
+              }
+            } else if (command == "light_thresh") {
+              if(cmd_value.toInt()) {
+                light_thresh = cmd_value.toInt();
+
+                // Inform client
+                client.println(F("HTTP/1.1 200 OK"));
+                client.println(F("Content-Type: text/json"));
+                client.println(F("Connection: close"));
+                client.println();
+                client.print(F("{\"Light threshold\":"));
+                client.print(light_thresh);
+                client.println(F("}"));
+              } else {
+                // Invalid SET parameter received
+                client.println(F("HTTP/1.1 400 Invalid parameter"));
+                client.println(F("Connection: close"));
               }
             } else if (command == "light_state") {
               if(cmd_value.toInt()) {
@@ -251,22 +299,22 @@ void loop() {
                 }
 
                 // Inform client
-                client.println("HTTP/1.1 200 OK");
-                client.println("Content-Type: text/json");
-                client.println("Connection: close");
+                client.println(F("HTTP/1.1 200 OK"));
+                client.println(F("Content-Type: text/json"));
+                client.println(F("Connection: close"));
                 client.println();
-                client.print("{\"Light state\":");
+                client.print(F("{\"Light state\":"));
                 client.print(light_state);
-                client.println("}");
+                client.println(F("}"));
               } else {
                 // Invalid SET parameter received
-                client.println("HTTP/1.1 400 Invalid parameter");
-                client.println("Connection: close");
+                client.println(F("HTTP/1.1 400 Invalid parameter"));
+                client.println(F("Connection: close"));
               }
             } else {
               // Unknown variable
-              client.println("HTTP/1.1 400 Unkown variable");
-              client.println("Connection: close");
+              client.println(F("HTTP/1.1 400 Unkown variable"));
+              client.println(F("Connection: close"));
             }
           }
           break;
@@ -295,7 +343,7 @@ void loop() {
     delay(1);
     // close the connection:
     client.stop();
-    Serial.println("[DONE]");
+    Serial.println(F("[DONE]"));
   }
 }
 
@@ -315,7 +363,7 @@ float read_filtered_DHT(float *buf_data, int sensor) {
       buf_data[0] = DHT.humidity;
       break;
     default:
-      Serial.println("[ERROR] Unknown sensor type");
+      Serial.println(F("[ERROR] Unknown sensor type"));
       return 0.0;
   }
 

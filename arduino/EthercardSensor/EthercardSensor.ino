@@ -5,6 +5,8 @@ Ethernet shield attached to pins 10, 11, 12, 13
 #include <SPI.h>
 #include <EtherCard.h>
 
+#define BUFFER 5
+
 // Enter a MAC address and IP address for your controller below.
 // The IP address will be dependent on your local network:
 static byte mymac[] = { 0x74,0x69,0x69,0x2D,0x30,0x31 };
@@ -18,8 +20,17 @@ BufferFiller bfill;
 
 // S0 counter
 long E_PV = 0; // Wh
+int P_PV[BUFFER]; // W
+
 int S0_prev_state = 1;
 int S0_pin = 7;
+unsigned long last_pulse = 0;
+bool first_pulse = true;
+
+// Water counter
+long H2O = 0; // liter
+int H2O_prev_state = 0;
+int H2O_pin = 6;
 
 void setup() {
   // Open serial communications and wait for port to open:
@@ -30,24 +41,69 @@ void setup() {
 
   // Setup pins
   pinMode(S0_pin,INPUT_PULLUP);
+  pinMode(H2O_pin,INPUT);
 
   // Start the Ethercard connection and the server:
   Serial.print("Starting ethernet host...");
   if (ether.begin(sizeof Ethernet::buffer, mymac) == 0)
-    Serial.println("[FAILED]");
-  Serial.println("[DONE]");
+    Serial.println(F("[FAILED]"));
+  Serial.println(F("[DONE]"));
   ether.staticSetup(myip);
   ether.printIp("Ethercard IP:  ", ether.myip);
+
+  // Initialize PV power buffer
+  for (int n = (BUFFER - 1); n > 0; n--) {
+    P_PV[n] = 0;
+  }
+}
+
+void H2O_read(void) {
+  int H2O_cur_state = digitalRead(H2O_pin);
+  //Serial.print("H2O state: ");
+  //Serial.println(H2O_cur_state);
+
+  if(H2O_prev_state == 0)
+  {
+    if (H2O_cur_state == 1)
+    { // Start of pulse detected
+      Serial.println("liter");
+      H2O += 1;
+    }
+  }
+
+  H2O_prev_state = H2O_cur_state;
 }
 
 void S0_read(void) {
   int S0_cur_state = digitalRead(S0_pin);
+  unsigned long delta_t_ms;
 
   if(S0_prev_state == 1)
   {
     if (S0_cur_state == 0)
     { // Start of pulse detected
       E_PV += 1;
+      if(first_pulse) {
+        first_pulse = false;
+      } else {
+        // Compute time difference
+        delta_t_ms = millis()-last_pulse; // ms
+        //Serial.print("Delta t in ms: ");
+        //Serial.println(delta_t_ms);
+        if (delta_t_ms > 0) { // Avoid devide by zero
+          // Rotate the buffer
+          for (int n = (BUFFER - 1); n > 0; n--) {
+            P_PV[n] = P_PV[n - 1];
+          }
+          // Computer PV power
+          P_PV[0] = 3600000 / delta_t_ms;
+          //Serial.print("Latest power in W: ");
+          //Serial.println(P_PV[0]);
+          //Serial.print("Average power in W: ");
+          //Serial.println(P_PV_average());
+        }        
+      }
+      last_pulse = millis();
     }
   }
 
@@ -59,9 +115,12 @@ void loop() {
    // Read S0 input
   S0_read();
 
-  // Processe ethernet clients 
+  // Read H2O input
+  H2O_read();
+
+  // Processe ethernet clients
   word len = ether.packetReceive();
-  word pos = ether.packetLoop(len);  
+  word pos = ether.packetLoop(len);
   if (pos) {
     String readline;
     String command;
@@ -71,14 +130,14 @@ void loop() {
     //Serial.println(len);
     //Serial.print("pos: ");
     //Serial.println(pos);
-    
+
     bfill = ether.tcpOffset();
     char *data = (char *) Ethernet::buffer + pos;
 
     for(int i = 0; i < len; i++) {
       // Read character from buffer
       char c = data[i];
-      
+
       // Store the HTTP request line
       if (readline.length() < 100) {
         readline += c;
@@ -89,7 +148,7 @@ void loop() {
       // so you can send a reply
       if (c == '\n' && currentLineIsBlank) {
         bfill = ether.tcpOffset();
-        
+
         // Parsing command
         char cmd_type = 'G';  // Default to GET command
         String cmd_value;
@@ -106,12 +165,12 @@ void loop() {
               command.remove(i);
             }
             else if(cnt == 2) {
-              Serial.println("Invalid command");
+              Serial.println(F("Invalid command"));
               // Invalid command received
               bfill.emit_p(PSTR(
               "HTTP/1.0 400 Invalid command\r\n"
               "Connection: close\r\n"));
-              ether.httpServerReply(bfill.position());             
+              ether.httpServerReply(bfill.position());
               break;
             }
           }
@@ -126,23 +185,39 @@ void loop() {
             "Content-Type: text/json\r\n"
             "Connection: close\r\n"
             "\r\n"
-            "{\"PV\": $L}"),E_PV);            
-          } else if (command == "pv") {
+            "{\"E_PV\": $L,"
+            "\"P_PV\": $D,"
+            "\"H2O\": $L}"),E_PV,P_PV_average(),H2O);
+          } else if (command == "E_PV") {
             bfill.emit_p(PSTR(
             "HTTP/1.0 200 OK\r\n"
             "Content-Type: text/json\r\n"
             "Connection: close\r\n"
             "\r\n"
-            "{\"PV\": $L}"),E_PV);     
+            "{\"PV\": $L}"),E_PV);
+          } else if (command == "P_PV") {
+            bfill.emit_p(PSTR(
+            "HTTP/1.0 200 OK\r\n"
+            "Content-Type: text/json\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            "{\"PV\": $D}"),P_PV_average());
+          } else if (command == "H2O") {
+            bfill.emit_p(PSTR(
+            "HTTP/1.0 200 OK\r\n"
+            "Content-Type: text/json\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            "{\"H2O\": $D}"),H2O);
           } else {
             bfill.emit_p(PSTR(
             "HTTP/1.0 400 Unknown variable\r\n"
-            "Connection: close\r\n"));  
+            "Connection: close\r\n"));
           }
         }
 
         // HTTP response
-        ether.httpServerReply(bfill.position());             
+        ether.httpServerReply(bfill.position());
       }
 
       // EOL character received
@@ -164,6 +239,16 @@ void loop() {
         // you've gotten a character on the current line
         currentLineIsBlank = false;
       }
-    } 
+    }
   }
+}
+
+int P_PV_average(void) {
+  int average = 0;
+
+  for (int n = 0; n < BUFFER; n++) {
+    average += P_PV[n];
+  }
+
+  return average / BUFFER;
 }

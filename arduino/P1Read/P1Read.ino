@@ -39,10 +39,16 @@ long E_PV = 0; // Wh
 int S0_prev_state = 1;
 int S0_pin = 7;
 
+// Water counter
+long H2O = 0; // liter
+int H2O_prev_state = 0;
+int H2O_pin = 6;
+
 void setup() {
   Serial.begin(115200);
   altSerial.begin(115200);
   pinMode(S0_pin,INPUT_PULLUP);
+  pinMode(H2O_pin, INPUT);
   //pinMode(6, OUTPUT);
   //digitalWrite(6, LOW);
   t_last = millis();
@@ -60,6 +66,20 @@ void S0_read(void) {
   }
 
   S0_prev_state = S0_cur_state;
+}
+
+void H2O_read(void) {
+  int H2O_cur_state = digitalRead(H2O_pin);
+
+  if(H2O_prev_state == 0)
+  {
+    if (H2O_cur_state == 1)
+    { // Start of pulse detected
+      E_PV += 1;
+    }
+  }
+
+  H2O_prev_state = H2O_cur_state;
 }
 
 void process_telegram(void) {
@@ -134,6 +154,8 @@ void decode_telegram(void) {
           Serial.println(E_last);
           Serial.print("E_PV: ");
           Serial.println(E_PV);
+          Serial.print("H2O: ");
+          Serial.println(H2O);
         }
       }
 
