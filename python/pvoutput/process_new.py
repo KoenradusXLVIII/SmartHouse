@@ -120,8 +120,8 @@ def main():
     #logging.info('Light State: On' if(door) else 'Light State: Off')
 
     # Prepare API data
-    #pvoutput_energy = pvoutput_url + '?d=%s&t=%s&v1=%s&v3=%s&v7=%s&v8=%s&v9=%s&c1=1' % (date_str,time_str,E_PV,E_cons,temp,humi,H2O)
-    pvoutput_energy = pvoutput_url + '?d=%s&t=%s&v1=%s&v2=%s&v3=%s&v7=%s&v8=%s&v9=%s&c1=1' % (date_str,time_str,E_PV,P_PV,E_cons,temp,humi,H2O)
+    pvoutput_energy = pvoutput_url + '?d=%s&t=%s&v1=%s&v3=%s&v7=%s&v8=%s&v9=%s&c1=1' % (date_str,time_str,E_PV,E_cons,temp,humi,H2O)
+    #pvoutput_energy = pvoutput_url + '?d=%s&t=%s&v1=%s&v2=%s&v3=%s&v7=%s&v8=%s&v9=%s&c1=1' % (date_str,time_str,E_PV,P_PV,E_cons,temp,humi,H2O)
     logging.debug('Request: %s' % pvoutput_energy)
 
     # Upload

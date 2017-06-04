@@ -9,9 +9,16 @@ Ethernet shield attached to pins 10, 11, 12, 13
 #define DHT21_PIN 2
 #define DOOR_CONTACT_PIN 3
 #define LIGHT_RELAY_PIN 4
+#define LIGHT_OVERRIDE_PIN 5
+#define WATER_VALVE_PIN 6
+#define WATER_OVERRIDE_PIN 7
 #define BUFFER 64
 #define CLOSED 0
 #define OPEN 1
+#define MANUAL 0
+#define AUTO 1
+#define OFF 0
+#define ON 1
 #define TEMP 0
 #define HUMI 1
 #define LIGHT_SENSOR_PIN 0
@@ -34,16 +41,21 @@ EthernetServer server(80);
   float buf_temp[BUFFER];
   float buf_humi[BUFFER];
   // Digital I/O variables
-  int cur_door_state = CLOSED;    // Default to closed
-  int prev_door_state = CLOSED;   // Default to closed
-  int light_state = LOW;          // Default to light off
+  int cur_door_state = CLOSED;          // Default to closed
+  int prev_door_state = CLOSED;         // Default to closed
+  int light_state = OFF;                // Default to light off
+  int light_hard_override_state = AUTO; // Default to AUTO mode
+  int light_soft_override_state = AUTO; // Default to AUTO mode 
   unsigned long close_time;
-  bool timer_on = false;          // Default timer off
-  int light_delay = 30;           // UOM: seconds
+  bool timer_on = false;                // Default timer off
+  int light_delay = 30;                 // UOM: seconds
+  int water_valve_state = OFF;          // Default to water off
+  int water_hard_override_state = AUTO; // Default to AUTO mode  
+  int water_soft_override_state = AUTO; // Default to AUTO mode
 
   // Light sensor
-  int light_intensity = 0;        // Default to darkness
-  int light_thresh = 512;         // 4.9mV per LSB, 0-5V 
+  int light_intensity = 0;          // Default to darkness
+  int light_thresh = 512;           // 4.9mV per LSB, 0-5V 
 
 void setup() {
   // Open serial communications and wait for port to open:
@@ -55,6 +67,9 @@ void setup() {
   // Initialze inputs
   pinMode(DOOR_CONTACT_PIN,INPUT);
   pinMode(LIGHT_RELAY_PIN,OUTPUT);
+  pinMode(LIGHT_OVERRIDE_PIN,INPUT_PULLUP);
+  pinMode(WATER_VALVE_PIN,OUTPUT);
+  pinMode(WATER_OVERRIDE_PIN,INPUT_PULLUP);
 
   // start the Ethernet connection and the server:
   Ethernet.begin(mac, ip);
@@ -90,6 +105,7 @@ void loop() {
   light_intensity = analogRead(LIGHT_SENSOR_PIN);
 
   // Process digital I/0
+  // Light
   cur_door_state = digitalRead(DOOR_CONTACT_PIN);
   if((prev_door_state == OPEN) and (cur_door_state == CLOSED)) {
     // Door was open and is now closed, start countdown
@@ -100,21 +116,39 @@ void loop() {
     if(timer_on) {
       if ((millis() - close_time) > (light_delay * 1000)) {
         // Timer has expired, turn light off
-        digitalWrite(LIGHT_RELAY_PIN, LOW);
-        light_state = LOW;
+        light_state = OFF;
         timer_on = false;
       }
     }
   } else { // cur_door_state == OPEN
     // Door is open, ...
     if(light_intensity < light_thresh) {
-      // ... and it is dark, turn light on.
-      digitalWrite(LIGHT_RELAY_PIN, HIGH);
-      light_state = HIGH;
+      // ... and it is dark, turn light ON....
+      light_hard_override_state = digitalRead(LIGHT_OVERRIDE_PIN);
+      if ((light_hard_override_state == AUTO) and (light_soft_override_state == AUTO)) {
+        // ... if no override present.
+        light_state = ON;
+      } else {
+         // ... otherwise turn OFF
+        light_state = OFF;
+      }
     }
   }
+  digitalWrite(LIGHT_RELAY_PIN, light_state);    
   prev_door_state = cur_door_state;
-
+  
+  // Water
+  water_hard_override_state = digitalRead(WATER_OVERRIDE_PIN);
+  if ((water_hard_override_state == MANUAL) or (water_soft_override_state == MANUAL)) {
+    // Manual override on water, OPEN valve
+    water_valve_state = OPEN;
+  } else {
+    // Automatic process to be implemented
+    // For now just CLOSED water valve
+    water_valve_state = CLOSED;
+  }
+  digitalWrite(WATER_VALVE_PIN, water_valve_state);
+  
   // Processe ethernet clients
   EthernetClient client = server.available();
   if (client) {
@@ -285,35 +319,40 @@ void loop() {
                 // Invalid SET parameter received
                 client.println(F("HTTP/1.1 400 Invalid parameter"));
                 client.println(F("Connection: close"));
+              }  
+            } else if (command == "light_mode") {
+              if(cmd_value == "auto") {
+                light_soft_override_state = AUTO;
+              } else if (cmd_value == "manual") {
+                light_soft_override_state = MANUAL;
               }
-            } else if (command == "light_state") {
-              if(cmd_value.toInt()) {
-                if(cmd_value) {
-                  // Turn light on
-                  digitalWrite(LIGHT_RELAY_PIN, HIGH);
-                  light_state = HIGH;
-                } else {
-                  // Turn light off
-                  digitalWrite(LIGHT_RELAY_PIN, LOW);
-                  light_state = LOW;
-                }
-
-                // Inform client
-                client.println(F("HTTP/1.1 200 OK"));
-                client.println(F("Content-Type: text/json"));
-                client.println(F("Connection: close"));
-                client.println();
-                client.print(F("{\"Light state\":"));
-                client.print(light_state);
-                client.println(F("}"));
-              } else {
-                // Invalid SET parameter received
-                client.println(F("HTTP/1.1 400 Invalid parameter"));
-                client.println(F("Connection: close"));
+              
+              // Inform client
+              client.println(F("HTTP/1.1 200 OK"));
+              client.println(F("Content-Type: text/json"));
+              client.println(F("Connection: close"));
+              client.println();
+              client.print(F("{\"Light mode\":"));
+              client.print(light_soft_override_state);
+              client.println(F("}"));
+            } else if (command == "water_mode") {
+              if(cmd_value == "auto") {
+                water_soft_override_state = AUTO;
+              } else if (cmd_value == "manual") {
+                water_soft_override_state = MANUAL;
               }
+              
+              // Inform client
+              client.println(F("HTTP/1.1 200 OK"));
+              client.println(F("Content-Type: text/json"));
+              client.println(F("Connection: close"));
+              client.println();
+              client.print(F("{\"Water mode\":"));
+              client.print(water_soft_override_state);
+              client.println(F("}"));
             } else {
-              // Unknown variable
-              client.println(F("HTTP/1.1 400 Unkown variable"));
+              // Invalid SET parameter received
+              client.println(F("HTTP/1.1 400 Invalid parameter"));
               client.println(F("Connection: close"));
             }
           }
