@@ -1,8 +1,8 @@
 
-def diff(cur):
+def diff(cur, name):
     # Read old value from data file
     try:
-        fp = open('H2O.dat','r')
+        fp = open(name + '.dat','r')
         old = int(fp.read())
         fp.close()
     except:
@@ -15,7 +15,7 @@ def diff(cur):
         diff = 0
 
     # Write new data to data file
-    fp = open('H2O.dat', 'w')
+    fp = open(name + '.dat', 'w')
     fp.write(str(cur))
     fp.close
 

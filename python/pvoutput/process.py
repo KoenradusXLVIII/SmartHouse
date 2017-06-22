@@ -8,17 +8,15 @@ import urllib
 import json
 import sys
 from P1 import read_telegram
-from H2O import diff
+from diff import diff
 
 # Script variables
-#verbose = True
 base_path = '/media/usb/log/'
 logfile = base_path + 'output.log'
 log_level = logging.INFO
-#interval = 300 # seconds
 
 # Configure logging
-logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s', level=log_level, datefmt='%Y-%m-%d %H:%M:%S', filename=logfile)
+logging.basicConfig(format='%(asctime)s [%(filename)s] [%(levelname)s] %(message)s', level=log_level, datefmt='%Y-%m-%d %H:%M:%S', filename=logfile)
 
 # Serial port configuration
 port = '/dev/ttyUSB0'
@@ -64,7 +62,7 @@ def main():
         E_PV = 0
 
     # Post-process water data
-    H2O = diff(H2O)
+    H2O = diff(H2O, 'H2O')
 
     # Get P1 data
     E_net = -1
