@@ -43,6 +43,12 @@ log_level = logging.INFO
 logging.basicConfig(format='%(asctime)s [%(filename)s] [%(levelname)s] %(message)s', level=log_level, datefmt='%Y-%m-%d %H:%M:%S', filename=logfile)
 logging.info('=== START OF SESSION ===')
 
+# Verbose
+verbose = False
+if(len(sys.argv) > 1):
+    if(sys.argv[1] == '-v'):
+        verbose = True
+
 # Query API
 try:
     response = urllib.urlopen(base + "forecast10day" + city )
@@ -52,10 +58,16 @@ except:
     sys.exit()
 
 # Get 10 day forecast
-today_high_temp = data_json['forecast']['simpleforecast']['forecastday'][0]['high']['celsius']
+today_high_temp = int(data_json['forecast']['simpleforecast']['forecastday'][0]['high']['celsius'])
+if(verbose):
+    print "Todays maximum temperature is: %dC" % (today_high_temp)
 for d in range(0, 10):
-    qpf_allday.append(data_json['forecast']['simpleforecast']['forecastday'][d]['qpf_allday']['mm'])
+    qpf_allday.append(int(data_json['forecast']['simpleforecast']['forecastday'][d]['qpf_allday']['mm']))
     qpf_allweek += qpf_allday[d]
+if(verbose):
+    print "This weeks rain forecast per day is:"
+    print qpf_allday
+    print "This weeks rain forecast in total is: %d" % (qpf_allweek)
 
 # Process forecast to sprinkler mode
 if (today_high_temp > lim_high_temp):
@@ -76,6 +88,8 @@ elif (today_high_temp > lim_low_temp):
         sprinkler_duration = low_duration
         sprinkler_times = low_times
         sprinkler_mode = 'low'
+if(verbose):
+    print "Sprinkler mode for today is: %s" % (sprinkler_mode)
 
 # Control actuators
 hour = dt.datetime.now().hour
@@ -89,6 +103,8 @@ if (hour in sprinkler_times):
     except:
         logging.error('No data received from Weather Underground')
         sys.exit()
+else:
+    logging.info("No action required [%s mode]" % (sprinkler_mode))
 
 # End program
 logging.info('=== END OF SESSION ===')
