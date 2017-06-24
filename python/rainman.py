@@ -59,10 +59,16 @@ except:
     sys.exit()
 
 # Get 10 day forecast
+# Temperature
 today_high_temp = int(data_json['forecast']['simpleforecast']['forecastday'][0]['high']['celsius'])
 if(verbose):
     print "Todays maximum temperature is: %dC" % (today_high_temp)
+<<<<<<< HEAD
 for d in range(0, lim_days_ahead):
+=======
+# Quantitative Precipitation Forecast
+for d in range(0, 10):
+>>>>>>> 4f3907ecdccaccf4fbd1f6e190beb41952324e40
     qpf_allday.append(int(data_json['forecast']['simpleforecast']['forecastday'][d]['qpf_allday']['mm']))
     qpf_allweek += qpf_allday[d]
 if(verbose):
