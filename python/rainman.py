@@ -20,6 +20,7 @@ lim_med_temp = 25 # C
 lim_low_temp = 20 # C
 lim_qpf_allday = 3 # mm
 lim_qpf_allweek = 3 # mm
+lim_days_ahead = 3 # days
 
 # Sprinkler modes
 high_duration = 8 # mins
@@ -61,13 +62,12 @@ except:
 today_high_temp = int(data_json['forecast']['simpleforecast']['forecastday'][0]['high']['celsius'])
 if(verbose):
     print "Todays maximum temperature is: %dC" % (today_high_temp)
-for d in range(0, 10):
+for d in range(0, lim_days_ahead):
     qpf_allday.append(int(data_json['forecast']['simpleforecast']['forecastday'][d]['qpf_allday']['mm']))
     qpf_allweek += qpf_allday[d]
 if(verbose):
-    print "This weeks rain forecast per day is:"
-    print qpf_allday
-    print "This weeks rain forecast in total is: %d" % (qpf_allweek)
+    print "Next %d days rain forecast per day is: [%s] mm" % (lim_days_ahead,str(qpf_allday)[1:-1])
+    print "This weeks rain forecast in total is: %d mm" % (qpf_allweek)
 
 # Process forecast to sprinkler mode
 if (today_high_temp > lim_high_temp):
@@ -83,8 +83,8 @@ elif (today_high_temp > lim_med_temp):
         sprinkler_times = med_times
         sprinkler_mode = 'medium'
 elif (today_high_temp > lim_low_temp):
-    if (qpf_allweek[0] < lim_qpf_allweek):
-        # Warm and no rain this week so low sprinkler mode
+    if (qpf_allweek < lim_qpf_allweek):
+        # Warm and no rain next x days so low sprinkler mode
         sprinkler_duration = low_duration
         sprinkler_times = low_times
         sprinkler_mode = 'low'
@@ -101,7 +101,7 @@ if (hour in sprinkler_times):
         f = urllib.urlopen(sprinkler_off)
         logging.info("Sprinklers disabled after %d minutes [%s mode]" % (sprinkler_duration, sprinkler_mode))
     except:
-        logging.error('No data received from Weather Underground')
+        logging.error('Unable to connect to GuardHouse')
         sys.exit()
 else:
     logging.info("No action required [%s mode]" % (sprinkler_mode))
