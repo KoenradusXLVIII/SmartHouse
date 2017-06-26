@@ -18,21 +18,25 @@ sprinkler_off = "http://192.168.1.112/water_mode/auto"
 lim_high_temp = 30 # C
 lim_med_temp = 25 # C
 lim_low_temp = 20 # C
-lim_qpf_allday = 3 # mm
-lim_qpf_allweek = 3 # mm
-lim_days_ahead = 3 # days
+lim_days_ahead_high_temp = 1 # days
+lim_days_ahead_med_temp = 2 # days
+lim_days_ahead_low_temp = 3 # days
+lim_qpf_high_temp = 3 # mm
+lim_qpf_med_temp = 3 # mm
+lim_qpf_low_temp = 3 # mm
 
 # Sprinkler modes
 high_duration = 8 # mins
 med_duration = 8 # mins
-low_duration = 10 # mins
+low_duration = 5 # mins
 high_times = [8, 11, 14, 17, 20]
 med_times = [8, 13, 18]
 low_times = [8, 18]
 
 # Define variables
 qpf_allday = []
-qpf_allweek = 0
+qpf_days_ahead = 0
+lim_days_ahead = 0
 sprinkler_times = []
 sprinkler_duration = 0
 sprinkler_mode = 'off'
@@ -64,37 +68,50 @@ today_high_temp = int(data_json['forecast']['simpleforecast']['forecastday'][0][
 if(verbose):
     print "Todays maximum temperature is: %dC" % (today_high_temp)
 # Quantitative Precipitation Forecast
-for d in range(0, lim_days_ahead):
+for d in range(0, 10):
     qpf_allday.append(int(data_json['forecast']['simpleforecast']['forecastday'][d]['qpf_allday']['mm']))
-    qpf_allweek += qpf_allday[d]
 if(verbose):
-    print "Next %d days rain forecast per day is: [%s] mm" % (lim_days_ahead,str(qpf_allday)[1:-1])
-    print "This weeks rain forecast in total is: %d mm" % (qpf_allweek)
+    print "Next 10 days rain forecast per day is: [%s] mm" % (str(qpf_allday)[1:-1])
 
 # Process forecast to sprinkler mode
 if (today_high_temp > lim_high_temp):
-    if (qpf_allday[0] < lim_qpf_allday):
+    qpf_days_ahead = sum(qpf_allday[1:lim_days_ahead_high_temp])
+    lim_days_ahead = lim_days_ahead_high_temp
+    if (qpf_days_ahead < lim_qpf_high_temp):
         # Very hot and no rain today so high sprinkler mode
         sprinkler_duration = high_duration
         sprinkler_times = high_times
         sprinkler_mode = 'high'
 elif (today_high_temp > lim_med_temp):
-    if (qpf_allday[0] < lim_qpf_allday):
+    qpf_days_ahead = sum(qpf_allday[1:lim_days_ahead_med_temp])
+    lim_days_ahead = lim_days_ahead_med_temp
+    if (qpf_days_ahead < lim_qpf_med_temp):
         # Hot and no rain today so medium sprinkler mode
         sprinkler_duration = med_duration
         sprinkler_times = med_times
         sprinkler_mode = 'medium'
 elif (today_high_temp > lim_low_temp):
-    if (qpf_allweek < lim_qpf_allweek):
+    qpf_days_ahead = sum(qpf_allday[1:lim_days_ahead_low_temp])
+    lim_days_ahead = lim_days_ahead_low_temp
+    if (qpf_days_ahead < lim_qpf_low_temp):
         # Warm and no rain next x days so low sprinkler mode
         sprinkler_duration = low_duration
         sprinkler_times = low_times
         sprinkler_mode = 'low'
+
 if(verbose):
+    print "Next %d days rain forecast in total is: %s mm" % (lim_days_ahead, qpf_days_ahead)
     print "Sprinkler mode for today is: %s" % (sprinkler_mode)
 
 # Control actuators
 hour = dt.datetime.now().hour
+if (hour == 0):
+    # Write daily forecast summary to logging
+    logging.info("Todays maximum temperature is: %dC" % (today_high_temp))
+    logging.info("Next 10 days rain forecast per day is: [%s] mm" % (str(qpf_allday)[1:-1]))
+    logging.info("Next %d days rain forecast in total is: %s mm" % (lim_days_ahead, qpf_days_ahead))
+    logging.info("Sprinkler mode for today is: %s" % (sprinkler_mode))
+
 if (hour in sprinkler_times):
     try:
         f = urllib.urlopen(sprinkler_on)
@@ -105,8 +122,8 @@ if (hour in sprinkler_times):
     except:
         logging.error('Unable to connect to GuardHouse')
         sys.exit()
-else:
-    logging.info("No action required [%s mode]" % (sprinkler_mode))
+#else:
+#    logging.info("No action required [%s mode]" % (sprinkler_mode))
 
 # End program
 logging.info('=== END OF SESSION ===')
