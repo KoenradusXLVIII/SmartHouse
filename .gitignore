@@ -8,3 +8,4 @@ arduino/P1Debug/build-uno/
 *.log
 *.dat
 *.pyc
+*.pickle

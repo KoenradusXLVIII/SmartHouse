@@ -1,5 +1,16 @@
+class OutOfRangeError(Exception): pass
+class NotIntegerError(Exception): pass
+class InvalidFilename(Exception): pass
 
 def diff(cur, name):
+    # Parse input
+    if cur < 0:
+        raise OutOfRangeError
+    if not cur == int(cur):
+        raise NotIntegerError
+    if not name:
+        raise InvalidFilename
+
     # Read old value from data file
     try:
         fp = open(name + '.dat','r')
