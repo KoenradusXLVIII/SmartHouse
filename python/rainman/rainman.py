@@ -5,6 +5,7 @@ import sys
 from time import sleep
 import pickle
 import logging
+import logging.handlers
 
 # Weather Underground API
 base = "http://api.wunderground.com/api/f0c3002dabae8c04/"
@@ -15,10 +16,15 @@ sprinkler_on = "http://192.168.1.112/water_mode/manual"
 sprinkler_off = "http://192.168.1.112/water_mode/auto"
 
 # Set up logging
-base_path = '/media/usb/log/'
-logfile = base_path + 'output.log'
 log_level = logging.INFO
-logging.basicConfig(format='%(asctime)s [%(filename)s] [%(levelname)s] %(message)s', level=log_level, datefmt='%Y-%m-%d %H:%M:%S', filename=logfile)
+handler = logging.handlers.SysLogHandler(address = '/dev/log')
+formatter = logging.Formatter('%(name)s %(levelname)s %(message)s')
+handler.setLevel(log_level)
+handler.setFormatter(formatter)
+# Create logging instance
+logger = logging.getLogger('rainman')
+logger.setLevel(log_level)
+logger.addHandler(handler)
 
 # Settings
 # Limits
@@ -26,34 +32,37 @@ lim_high_temp = 30 # C
 lim_med_temp = 25 # C
 lim_low_temp = 20 # C
 lim_days_ahead_high_temp = 1 # days
-lim_days_ahead_med_temp = 1 # days
-lim_days_ahead_low_temp = 3 # days
+lim_days_ahead_med_temp = 3 # days
+lim_days_ahead_low_temp = 5 # days
 lim_qpf_ahead_high_temp = 5 # mm
 lim_qpf_ahead_med_temp = 3 # mm
 lim_qpf_ahead_low_temp = 3 # mm
-lim_qpf_yesterday_high_temp = 8 # mm
-lim_qpf_yesterday_med_temp = 4 # mm
-lim_qpf_yesterday_low_temp = 2 # mm
+lim_qpf_yesterday_high_temp = 4 # mm
+lim_qpf_yesterday_med_temp = 2 # mm
+lim_qpf_yesterday_low_temp = 1 # mm
 
 # Sprinkler modes
-high_duration = 10 # mins
-med_duration = 10 # mins
-low_duration = 10 # mins
+high_duration = 3 # mins
+med_duration = 3 # mins
+low_duration = 3 # mins
 high_times = [8, 11, 14, 17, 20]
 med_times = [8, 13, 18]
 low_times = [8, 18]
 
-# Verbose
+# Check command line parameters
 verbose = False
+force = False
 if(len(sys.argv) > 1):
     if('v' in sys.argv[1]):
         verbose = True
+    if('f' in sys.argv[1]):
+        force = True
 
 # Intialize
 hour = dt.datetime.now().hour
 
 # Run forecast once a day at 6 o'clock or forced
-if (hour == 6) or ('f' in sys.argv[1]):
+if (hour == 6) or (force):
 # Define variables
     qpf_allday = []
     qpf_days_ahead = 0
@@ -67,7 +76,7 @@ if (hour == 6) or ('f' in sys.argv[1]):
         response = urllib.urlopen(base + "forecast10day" + city )
         data_json = json.loads(response.read())
     except:
-        logging.error('No data received from Weather Underground')
+        logger.error('No data received from Weather Underground')
         sys.exit()
 
     # Get yesterdays precipitation from file
@@ -124,12 +133,12 @@ if (hour == 6) or ('f' in sys.argv[1]):
         print "Sprinkler mode for today is: %s" % (sprinkler_mode)
 
     # Write daily forecast summary to logging
-    logging.info("= DAILY WEATHER FORECAST =")
-    logging.info("Forecasted maximum temperature is: %dC" % (today_high_temp))
-    logging.info("Next 10 days rain forecast per day is: [%s] mm" % (str(qpf_allday)[1:-1]))
+    logger.info("= DAILY WEATHER FORECAST =")
+    logger.info("Forecasted maximum temperature is: %dC" % (today_high_temp))
+    logger.info("Next 10 days rain forecast per day is: [%s] mm" % (str(qpf_allday)[1:-1]))
     if(lim_days_ahead):
-        logging.info("Next %d days rain forecast in total is: [%s] mm" % (lim_days_ahead, str(qpf_allday)[1:3*lim_days_ahead-1]))
-    logging.info("Sprinkler mode for today is: %s" % (sprinkler_mode))
+        logger.info("Next %d days rain forecast in total is: [%s] mm" % (lim_days_ahead, str(qpf_allday)[1:3*lim_days_ahead-1]))
+    logger.info("Sprinkler mode for today is: %s" % (sprinkler_mode))
     with open('sprinkler.pickle', 'w') as fp:
         pickle.dump([today_high_temp,qpf_allday,qpf_yesterday,lim_days_ahead,sprinkler_mode,sprinkler_duration,sprinkler_times], fp)
 
@@ -138,15 +147,15 @@ with open('sprinkler.pickle') as fp:
 
 if (hour in sprinkler_times):
     try:
-        logging.info("Latest maximum temperature forecast is: %dC" % (today_high_temp))
+        logger.info("Latest maximum temperature forecast is: %dC" % (today_high_temp))
         if(lim_days_ahead):
-            logging.info("Latest %d days rain forecast in total is: [%s] mm" % (lim_days_ahead, str(qpf_allday)[1:3*lim_days_ahead-1]))
-        logging.info("Sprinkler mode is: %s" % (sprinkler_mode))
+            logger.info("Latest %d days rain forecast in total is: [%s] mm" % (lim_days_ahead, str(qpf_allday)[1:3*lim_days_ahead-1]))
+        logger.info("Sprinkler mode is: %s" % (sprinkler_mode))
         f = urllib.urlopen(sprinkler_on)
-        logging.info("Sprinklers enabled for %d minutes [%s mode]" % (sprinkler_duration, sprinkler_mode))
+        logger.info("Sprinklers enabled for %d minutes [%s mode]" % (sprinkler_duration, sprinkler_mode))
         sleep(sprinkler_duration*60)
         f = urllib.urlopen(sprinkler_off)
-        logging.info("Sprinklers disabled after %d minutes [%s mode]" % (sprinkler_duration, sprinkler_mode))
+        logger.info("Sprinklers disabled after %d minutes [%s mode]" % (sprinkler_duration, sprinkler_mode))
     except:
-        logging.error('Unable to connect to GuardHouse')
+        logger.error('Unable to connect to GuardHouse')
         sys.exit()

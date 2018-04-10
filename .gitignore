@@ -3,3 +3,4 @@ build-uno/
 *.dat
 *.pyc
 *.pickle
+python/pvoutput/data/

@@ -1,7 +1,7 @@
 import re
 from PyCRC.CRC16 import CRC16
 
-def read_telegram(ser, logging):
+def read_telegram(ser, logger, port):
     # Smart meter configuration
     serial_number = 'XMX5LGBBFG1009050373'
     eot_char = '!' # End of transmission character
@@ -23,24 +23,24 @@ def read_telegram(ser, logging):
     try:
         data_raw = str(ser.readline())
     except:
-        logging.error('Unable to read from serial port: %s' % port)
+        logger.error('Unable to read from serial port: %s' % port)
         sys.exit()
 
     while (serial_number not in data_raw):
         try:
             data_raw = str(ser.readline())
         except:
-            logging.error('Unable to read from serial port: %s' % port)
+            logger.error('Unable to read from serial port: %s' % port)
             sys.exit()
         itt += 1
         if (itt >= telegram_length):
-            logging.warning('Invalid telegram')
+            logger.warning('Invalid telegram')
             return -1
 
     # Start of transmission detected
-    logging.info('Start of transmission detected')
+    logger.info('Start of transmission detected')
     data.append(data_raw.strip())
-    logging.debug('Data received: %s' % data_raw.strip())
+    logger.debug('Data received: %s' % data_raw.strip())
     CRC_data += data_raw
 
     # Read appropriate amount of lines
@@ -48,11 +48,11 @@ def read_telegram(ser, logging):
         try:
             data_raw = str(ser.readline())
         except:
-            logging.error('Unable to read from serial port: %s' % port)
+            logger.error('Unable to read from serial port: %s' % port)
             sys.exit()
         data.append(data_raw.strip())
         if (data_raw.startswith(eot_char)):
-            logging.info('End of transmission detected')
+            logger.info('End of transmission detected')
         else:
             CRC_data += data_raw
 
@@ -65,7 +65,7 @@ def read_telegram(ser, logging):
         CRC_rec = CRC_rec[1:] # Remove '!' for displayed CRC
 
         if (CRC == CRC_rec):
-            logging.info('Valid data, CRC match: 0x%s' % CRC)
+            logger.info('Valid data, CRC match: 0x%s' % CRC)
 
             # Parsa data and compute net energy usage
             energy = 0.0
@@ -73,7 +73,7 @@ def read_telegram(ser, logging):
                 for desc, ref, regex in OBIS:
                     if(data[line].startswith(ref)):
                         m = re.search(regex,data[line])
-                        logging.debug('%s: %s' % (desc,m.group(3)))
+                        logger.debug('%s: %s' % (desc,m.group(3)))
                         if(data[line].startswith('1-0:1.')):
                             energy += float(m.group(3))
                         else:
@@ -81,9 +81,9 @@ def read_telegram(ser, logging):
 
             # Return energy value [Wh]
             energy *= 1000
-            logging.info('Valid energy value received: %f Wh' % energy)
+            logger.info('Valid energy value received: %f Wh' % energy)
             return int(energy)
         else:
             # Message incorrect, CRC mismatch
-            logging.warning('CRC mismatch: 0x%s / 0x%s' % (CRC,CRC_rec))
+            logger.warning('CRC mismatch: 0x%s / 0x%s' % (CRC,CRC_rec))
             return -1

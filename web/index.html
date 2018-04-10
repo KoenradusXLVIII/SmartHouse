@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script type="text/JavaScript">
+// Script configuration
+var refreshInterval = 5000; //in ms
+var canvas_width = 640;
+
+// Garden configuration
+var garden_img;
+var garden_url = "http://192.168.1.128:88/cgi-bin/CGIProxy.fcgi?cmd=snapPicture2&usr=joost&pwd=653956jv"; //url to load image from
+
+// Inside configuration
+var inside_img;
+var inside_url = "http://192.168.1.101:88/cgi-bin/CGIProxy.fcgi?cmd=snapPicture2&usr=joost&pwd=653956jv"; //url to load image from
+
+
+function init() {
+    // Garden
+	var garden_canvas = document.getElementById("garden_canvas");
+    var garden_context = garden_canvas.getContext("2d");
+    garden_img = new Image();
+    garden_img.onload = function() {
+        garden_canvas.setAttribute("width", canvas_width);
+        garden_canvas.setAttribute("height", garden_img.height/(garden_img.width/canvas_width));
+        garden_context.drawImage(this, 0, 0, canvas_width, garden_img.height/(garden_img.width/canvas_width));
+    };
+	
+	// Inside
+	var inside_canvas = document.getElementById("inside_canvas");
+    var inside_context = inside_canvas.getContext("2d");
+    inside_img = new Image();
+    inside_img.onload = function() {
+        inside_canvas.setAttribute("width", canvas_width);
+        inside_canvas.setAttribute("height", inside_img.height/(inside_img.width/canvas_width));
+        inside_context.drawImage(this, 0, 0, canvas_width, inside_img.height/(inside_img.width/canvas_width));
+    };
+	
+    refresh();
+}
+function refresh()
+{
+    garden_img.src = garden_url + "&t=" + new Date().getTime();
+	inside_img.src = inside_url + "&t=" + new Date().getTime();
+    setTimeout("refresh()",refreshInterval);
+}
+
+</script>
+</head>
+<body onload="JavaScript:init();">
+<canvas id="garden_canvas"></canvas></br></br>
+<canvas id="inside_canvas"></canvas>
+</body>
+</html>
