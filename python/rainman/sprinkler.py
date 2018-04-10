@@ -1,23 +1,36 @@
 import urllib
 import sys
 from time import sleep
+import logging
+import logging.handlers
 
 sprinkler_on = "http://192.168.1.112/water_mode/manual"
 sprinkler_off = "http://192.168.1.112/water_mode/auto"
+
+# Set up logging
+log_level = logging.INFO
+handler = logging.handlers.SysLogHandler(address = '/dev/log')
+formatter = logging.Formatter('%(name)s %(levelname)s %(message)s')
+handler.setLevel(log_level)
+handler.setFormatter(formatter)
+# Create logging instance
+logger = logging.getLogger('sprinkler')
+logger.setLevel(log_level)
+logger.addHandler(handler)
 
 if(len(sys.argv) > 1):
     try:
         sprinkler_duration = int(sys.argv[1]) # min
         try:
             f = urllib.urlopen(sprinkler_on)
-            print "Sprinklers enabled for %d minutes" % (sprinkler_duration)
+            logger.info("Sprinklers enabled for %d minutes" % (sprinkler_duration))
             sleep(sprinkler_duration*60)
             f = urllib.urlopen(sprinkler_off)
-            print "Sprinklers disabled after %d minutes" % (sprinkler_duration)
+            logger.info("Sprinklers disabled after %d minutes" % (sprinkler_duration))
         except:
-            print "Unable to connect to sprinkler system"
+            logger.error("Unable to connect to sprinkler system")
             sys.exit()
     except TypeError:
-        print "[ERROR]: No integer sprinkler interval supplied"
+        logger.warning("No integer sprinkler interval supplied")
 else:
-    print "[ERROR]: No sprinkler interval supplied"
+    logger.warning("No sprinkler interval supplied")
