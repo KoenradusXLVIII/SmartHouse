@@ -66,7 +66,7 @@ void H2O_read(void) {
   {
     if (H2O_cur_state == 1)
     { // Start of pulse detected
-      Serial.println("liter");
+      //Serial.println("liter");
       H2O += 1;
     }
   }
@@ -209,14 +209,14 @@ void loop() {
             "Content-Type: text/json\r\n"
             "Connection: close\r\n"
             "\r\n"
-            "{\"PV\": $L}"),E_PV);
+            "{\"E_PV\": $L}"),E_PV);
           } else if (command == "P_PV") {
             bfill.emit_p(PSTR(
             "HTTP/1.0 200 OK\r\n"
             "Content-Type: text/json\r\n"
             "Connection: close\r\n"
             "\r\n"
-            "{\"PV\": $D}"),P_PV_average());
+            "{\"P_PV\": $D}"),P_PV_average());
           } else if (command == "H2O") {
             bfill.emit_p(PSTR(
             "HTTP/1.0 200 OK\r\n"
