@@ -77,6 +77,9 @@ void H2O_read(void) {
 void S0_read(void) {
   int S0_cur_state = digitalRead(S0_pin);
   unsigned long delta_t_ms;
+  
+  // Compute time difference
+  delta_t_ms = millis()-last_pulse; // ms
 
   if(S0_prev_state == 1)
   {
@@ -86,8 +89,6 @@ void S0_read(void) {
       if(first_pulse) {
         first_pulse = false;
       } else {
-        // Compute time difference
-        delta_t_ms = millis()-last_pulse; // ms
         //Serial.print("Delta t in ms: ");
         //Serial.println(delta_t_ms);
         if (delta_t_ms > 0) { // Avoid devide by zero
@@ -105,6 +106,20 @@ void S0_read(void) {
       }
       last_pulse = millis();
     }
+  } 
+  else 
+  { // Minimum 'real' production is 30W = 2 pulses per minute
+    // So if more then 1 minutes passes without a pulse:
+    // Rotate the buffer and write 0W PV power to first position
+    if (delta_t_ms > 60000)
+    {
+      // Rotate the buffer
+      for (int n = (BUFFER - 1); n > 0; n--) {
+        P_PV[n] = P_PV[n - 1];
+      }
+      // Write zero PV power
+      P_PV[0] = 0;
+    }     
   }
 
   S0_prev_state = S0_cur_state;
