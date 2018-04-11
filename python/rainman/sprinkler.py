@@ -19,18 +19,26 @@ logger.setLevel(log_level)
 logger.addHandler(handler)
 
 if(len(sys.argv) > 1):
-    try:
-        sprinkler_duration = int(sys.argv[1]) # min
-        try:
-            f = urllib.urlopen(sprinkler_on)
-            logger.info("Sprinklers enabled for %d minutes" % (sprinkler_duration))
-            sleep(sprinkler_duration*60)
-            f = urllib.urlopen(sprinkler_off)
-            logger.info("Sprinklers disabled after %d minutes" % (sprinkler_duration))
-        except:
-            logger.error("Unable to connect to sprinkler system")
-            sys.exit()
-    except TypeError:
-        logger.warning("No integer sprinkler interval supplied")
+	if('off' in sys.argv[1]):
+		try:
+			f = urllib.urlopen(sprinkler_off)
+			logger.info("Sprinklers manually disabled")
+		except:
+			logger.error("Unable to connect to sprinkler system")
+			sys.exit()
+	else:
+		try:
+			sprinkler_duration = int(sys.argv[1]) # min
+			try:
+				f = urllib.urlopen(sprinkler_on)
+				logger.info("Sprinklers enabled for %d minutes" % (sprinkler_duration))
+				sleep(sprinkler_duration*60)
+				f = urllib.urlopen(sprinkler_off)
+				logger.info("Sprinklers disabled after %d minutes" % (sprinkler_duration))
+			except:
+				logger.error("Unable to connect to sprinkler system")
+				sys.exit()
+		except TypeError:
+			logger.warning("No integer sprinkler interval supplied")
 else:
-    logger.warning("No sprinkler interval supplied")
+    logger.warning("No sprinkler arguments supplied")

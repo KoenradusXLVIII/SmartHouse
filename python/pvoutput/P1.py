@@ -67,7 +67,7 @@ def read_telegram(ser, logger, port):
         if (CRC == CRC_rec):
             logger.info('Valid data, CRC match: 0x%s' % CRC)
 
-            # Parsa data and compute net energy usage
+            # Parse data and compute net energy usage
             energy = 0.0
             for line in range (1,len(data)):
                 for desc, ref, regex in OBIS:

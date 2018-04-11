@@ -15,7 +15,7 @@ city = "/q/NL/Eindhoven.json"
 sprinkler_on = "http://192.168.1.112/water_mode/manual"
 sprinkler_off = "http://192.168.1.112/water_mode/auto"
 
-# Set up logging
+# Set up logging to syslog for Papertrailapp.com
 log_level = logging.INFO
 handler = logging.handlers.SysLogHandler(address = '/dev/log')
 formatter = logging.Formatter('%(name)s %(levelname)s %(message)s')
@@ -25,6 +25,8 @@ handler.setFormatter(formatter)
 logger = logging.getLogger('rainman')
 logger.setLevel(log_level)
 logger.addHandler(handler)
+
+# Set up Sensorcloud.com
 
 # Settings
 # Limits
@@ -91,8 +93,6 @@ if (hour == 6) or (force):
     # Quantitative Precipitation Forecast
     for d in range(0, 10):
         qpf_allday.append(int(data_json['forecast']['simpleforecast']['forecastday'][d]['qpf_allday']['mm']))
-    # Store todays precipitation for tomorrow
-    qpf_yesterday = qpf_allday[0]
 
     if(verbose):
         print "Yesterday recorded rain: %s mm" % (qpf_yesterday)
@@ -135,10 +135,15 @@ if (hour == 6) or (force):
     # Write daily forecast summary to logging
     logger.info("= DAILY WEATHER FORECAST =")
     logger.info("Forecasted maximum temperature is: %dC" % (today_high_temp))
+	logger.info("Yesterday recorded rain: %s mm" % (qpf_yesterday))
     logger.info("Next 10 days rain forecast per day is: [%s] mm" % (str(qpf_allday)[1:-1]))
     if(lim_days_ahead):
         logger.info("Next %d days rain forecast in total is: [%s] mm" % (lim_days_ahead, str(qpf_allday)[1:3*lim_days_ahead-1]))
     logger.info("Sprinkler mode for today is: %s" % (sprinkler_mode))
+	
+	# Store todays precipitation for tomorrow
+    qpf_yesterday = qpf_allday[0]
+	# Write forecast to file
     with open('sprinkler.pickle', 'w') as fp:
         pickle.dump([today_high_temp,qpf_allday,qpf_yesterday,lim_days_ahead,sprinkler_mode,sprinkler_duration,sprinkler_times], fp)
 
