@@ -110,16 +110,19 @@ void S0_read(void) {
   else 
   { // Minimum 'real' production is 30W = 2 pulses per minute
     // So if more then 1 minutes passes without a pulse:
-    // Rotate the buffer and write 0W PV power to first position
-    if (delta_t_ms > 60000)
+    // Flush the buffer and reset delta timer
+    if(first_pulse == false)
     {
-      // Rotate the buffer
-      for (int n = (BUFFER - 1); n > 0; n--) {
-        P_PV[n] = P_PV[n - 1];
+      if (delta_t_ms > 60000)
+      {
+        // Flush the buffer
+        for (int n = 0; n < BUFFER; n++) {
+          P_PV[n] = 0;
+        }
+        // Reset delta timer by toggling first_pulse bit
+        first_pulse = true;
       }
-      // Write zero PV power
-      P_PV[0] = 0;
-    }     
+    }
   }
 
   S0_prev_state = S0_cur_state;
