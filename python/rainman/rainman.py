@@ -26,7 +26,7 @@ logger = logging.getLogger('rainman')
 logger.setLevel(log_level)
 logger.addHandler(handler)
 
-# Set up Sensorcloud.com
+# Set up logging to Sensorcloud.com
 
 # Settings
 # Limits
