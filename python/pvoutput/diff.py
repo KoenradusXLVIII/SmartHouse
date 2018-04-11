@@ -11,6 +11,7 @@ def diff(cur, name):
     if not name:
         raise InvalidFilename
 
+	# TODO: PICKLE THIS
     # Read old value from data file
     try:
         fp = open(name + '.dat','r')

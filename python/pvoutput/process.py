@@ -13,7 +13,7 @@ from diff import diff
 # Set up logging
 log_level = logging.INFO
 handler = logging.handlers.SysLogHandler(address = '/dev/log')
-formatter = logging.Formatter('%(name)s %(levelname)s %(message)s')
+formatter = logging.Formatter('%(name)s [%(levelname)s] %(message)s')
 handler.setLevel(log_level)
 handler.setFormatter(formatter)
 # Create logging instance
@@ -51,7 +51,7 @@ pvoutput_url="http://pvoutput.org/service/r2/addstatus.jsp"
 
 def main():
     # Start new session
-    logger.info('=== START OF SESSION ===')
+    logger.debug('=== START OF SESSION ===')
 
     # Get solar and water data
     try:
@@ -60,26 +60,30 @@ def main():
         E_PV = data_json['E_PV']
         P_PV = data_json['P_PV']
         H2O = data_json['H2O']
+		# Post-process water data
+		H2O = diff(H2O, 'H2O')
     except:
         logger.error('No data received from Main House')
-        E_PV = 0
-
-    # Post-process water data
-    H2O = diff(H2O, 'H2O')
+        sys.exit()
 
     # Get P1 data
+	# Initialize variables
     E_net = -1
+	P_net = -1
     itt = 0
-    while ((E_net < 0) and (itt < p1_retries)):
-        E_net = read_telegram(ser, logger, port)
+    while ((P_net < 0) and (itt < p1_retries)):
+        [P_net, E_net] = read_telegram(ser, logger, port)
+		print "Power: %s" % P_net
+		print "Energy: %s" % E_Net
         itt += 1
 
     if(itt == p1_retries): # No valid value received within maximum number of tries
         logger.error('No valid P1 data after %d retries' % itt-1)
         sys.exit()
 
-    # Compute energy Consumption
+    # Compute Power and Energy Consumption
     E_cons = E_PV + E_net # v3
+	P_cons = P_PV + P_net # v4
 
     # Get extended data
     try:
@@ -110,19 +114,20 @@ def main():
     logger.debug('Date: %s' % date_str)
     logger.debug('Time: %s' % time_str)
     logger.info('Power Generation: %s W' % P_PV)
-    logger.info('Energy Generation: %s Wh' % E_PV)
-    logger.info('Energy Net Import: %s Wh' % E_net)
-    logger.info('Energy Consumption: %s Wh' % E_cons)
+	logger.info('Power Consumption: %s W' % P_cons)
+    logger.debug('Energy Generation: %s Wh' % E_PV)
+    logger.debug('Energy Net Import: %s Wh' % E_net)
+    logger.debug('Energy Consumption: %s Wh' % E_cons)
     logger.info('Water Consumption: %s liter' % H2O)
     logger.info('Temperature: %s' % temp)
     logger.info('Humidity: %s' % humi)
 
-    #logger.info('Door State: Open' if(door) else 'Door State: Closed')
-    #logger.info('Light State: On' if(door) else 'Light State: Off')
+    #logger.debug('Door State: Open' if(door) else 'Door State: Closed')
+    #logger.debug('Light State: On' if(door) else 'Light State: Off')
 
     # Prepare API data
     #pvoutput_energy = pvoutput_url + '?d=%s&t=%s&v1=%s&v3=%s&v7=%s&v8=%s&v9=%s&c1=1' % (date_str,time_str,E_PV,E_cons,temp,humi,H2O)
-    pvoutput_energy = pvoutput_url + '?d=%s&t=%s&v1=%s&v2=%s&v3=%s&v7=%s&v8=%s&v9=%s&c1=1' % (date_str,time_str,E_PV,P_PV,E_cons,temp,humi,H2O)
+    pvoutput_energy = pvoutput_url + '?d=%s&t=%s&v1=%s&v2=%s&v3=%s&v4=%s&v7=%s&v8=%s&v9=%s&c1=1' % (date_str,time_str,E_PV,P_PV,E_cons,P_cons,temp,humi,H2O)
     logger.debug('Request: %s' % pvoutput_energy)
 
     # Upload
@@ -132,7 +137,7 @@ def main():
     #logger.debug('Data received from Arduino: %s' % data_raw)
     logger.debug('Energy data upload: %s' % r.content)
 
-    logger.info('=== END OF SESSION ===')
+    logger.debug('=== END OF SESSION ===')
 
 if __name__ == "__main__":
     main()

@@ -52,7 +52,7 @@ void setup() {
   ether.printIp("Ethercard IP:  ", ether.myip);
 
   // Initialize PV power buffer
-  for (int n = (BUFFER - 1); n > 0; n--) {
+  for (int n = 0; n < BUFFER; n++) {
     P_PV[n] = 0;
   }
 }

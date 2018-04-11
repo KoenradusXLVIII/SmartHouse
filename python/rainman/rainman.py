@@ -18,7 +18,7 @@ sprinkler_off = "http://192.168.1.112/water_mode/auto"
 # Set up logging to syslog for Papertrailapp.com
 log_level = logging.INFO
 handler = logging.handlers.SysLogHandler(address = '/dev/log')
-formatter = logging.Formatter('%(name)s %(levelname)s %(message)s')
+formatter = logging.Formatter('%(name)s [%(levelname)s] %(message)s')
 handler.setLevel(log_level)
 handler.setFormatter(formatter)
 # Create logging instance
