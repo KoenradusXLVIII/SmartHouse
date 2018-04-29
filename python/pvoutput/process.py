@@ -61,7 +61,7 @@ def main():
         P_PV = data_json['P_PV']
         H2O = data_json['H2O']
 		# Post-process water data
-		H2O = diff(H2O, 'H2O')
+        H2O = diff(H2O, 'H2O')
     except:
         logger.error('No data received from Main House')
         sys.exit()
@@ -69,12 +69,12 @@ def main():
     # Get P1 data
 	# Initialize variables
     E_net = -1
-	P_net = -1
+    P_net = -1
     itt = 0
-    while ((P_net < 0) and (itt < p1_retries)):
+    while ((E_net < 0) and (itt < p1_retries)):
         [P_net, E_net] = read_telegram(ser, logger, port)
-		print "Power: %s" % P_net
-		print "Energy: %s" % E_Net
+        print "Power: %s" % P_net
+        print "Energy: %s" % E_net
         itt += 1
 
     if(itt == p1_retries): # No valid value received within maximum number of tries
@@ -83,7 +83,7 @@ def main():
 
     # Compute Power and Energy Consumption
     E_cons = E_PV + E_net # v3
-	P_cons = P_PV + P_net # v4
+    P_cons = P_PV + P_net # v4
 
     # Get extended data
     try:
@@ -114,7 +114,7 @@ def main():
     logger.debug('Date: %s' % date_str)
     logger.debug('Time: %s' % time_str)
     logger.info('Power Generation: %s W' % P_PV)
-	logger.info('Power Consumption: %s W' % P_cons)
+    logger.info('Power Consumption: %s W' % P_cons)
     logger.debug('Energy Generation: %s Wh' % E_PV)
     logger.debug('Energy Net Import: %s Wh' % E_net)
     logger.debug('Energy Consumption: %s Wh' % E_cons)

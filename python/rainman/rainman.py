@@ -30,12 +30,12 @@ logger.addHandler(handler)
 
 # Settings
 # Limits
-lim_high_temp = 30 # C
-lim_med_temp = 25 # C
-lim_low_temp = 20 # C
+lim_high_temp = 35 # C
+lim_med_temp = 30 # C
+lim_low_temp = 25 # C
 lim_days_ahead_high_temp = 1 # days
-lim_days_ahead_med_temp = 3 # days
-lim_days_ahead_low_temp = 5 # days
+lim_days_ahead_med_temp = 2 # days
+lim_days_ahead_low_temp = 3 # days
 lim_qpf_ahead_high_temp = 5 # mm
 lim_qpf_ahead_med_temp = 3 # mm
 lim_qpf_ahead_low_temp = 3 # mm
@@ -44,12 +44,12 @@ lim_qpf_yesterday_med_temp = 2 # mm
 lim_qpf_yesterday_low_temp = 1 # mm
 
 # Sprinkler modes
-high_duration = 3 # mins
-med_duration = 3 # mins
+high_duration = 5 # mins
+med_duration = 5 # mins
 low_duration = 3 # mins
-high_times = [8, 11, 14, 17, 20]
-med_times = [8, 13, 18]
-low_times = [8, 18]
+high_times = [8, 13, 18]
+med_times = [8, 18]
+low_times = [18]
 
 # Check command line parameters
 verbose = False
@@ -83,7 +83,8 @@ if (hour == 6) or (force):
 
     # Get yesterdays precipitation from file
     with open('sprinkler.pickle') as fp:
-        qpf_yesterday = pickle.load(fp)
+        pickle_load = pickle.load(fp)
+        qpf_yesterday = pickle_load[2]
 
     # Get 10 day forecast
     # Temperature
@@ -135,12 +136,12 @@ if (hour == 6) or (force):
     # Write daily forecast summary to logging
     logger.info("= DAILY WEATHER FORECAST =")
     logger.info("Forecasted maximum temperature is: %dC" % (today_high_temp))
-	logger.info("Yesterday recorded rain: %s mm" % (qpf_yesterday))
+    logger.info("Yesterday recorded rain: %s mm" % (qpf_yesterday))
     logger.info("Next 10 days rain forecast per day is: [%s] mm" % (str(qpf_allday)[1:-1]))
     if(lim_days_ahead):
         logger.info("Next %d days rain forecast in total is: [%s] mm" % (lim_days_ahead, str(qpf_allday)[1:3*lim_days_ahead-1]))
     logger.info("Sprinkler mode for today is: %s" % (sprinkler_mode))
-	
+
 	# Store todays precipitation for tomorrow
     qpf_yesterday = qpf_allday[0]
 	# Write forecast to file
@@ -152,10 +153,10 @@ with open('sprinkler.pickle') as fp:
 
 if (hour in sprinkler_times):
     try:
-        logger.info("Latest maximum temperature forecast is: %dC" % (today_high_temp))
-        if(lim_days_ahead):
-            logger.info("Latest %d days rain forecast in total is: [%s] mm" % (lim_days_ahead, str(qpf_allday)[1:3*lim_days_ahead-1]))
-        logger.info("Sprinkler mode is: %s" % (sprinkler_mode))
+        #logger.info("Latest maximum temperature forecast is: %dC" % (today_high_temp))
+        #if(lim_days_ahead):
+        #    logger.info("Latest %d days rain forecast in total is: [%s] mm" % (lim_days_ahead, str(qpf_allday)[1:3*lim_days_ahead-1]))
+        #logger.info("Sprinkler mode is: %s" % (sprinkler_mode))
         f = urllib.urlopen(sprinkler_on)
         logger.info("Sprinklers enabled for %d minutes [%s mode]" % (sprinkler_duration, sprinkler_mode))
         sleep(sprinkler_duration*60)
