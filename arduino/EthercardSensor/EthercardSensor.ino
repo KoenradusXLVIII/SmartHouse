@@ -6,6 +6,8 @@ Ethernet shield attached to pins 10, 11, 12, 13
 #include <EtherCard.h>
 
 #define BUFFER 5
+#define E_PV_RESTORE 435945
+#define H20_RESTORE 14490
 
 // Enter a MAC address and IP address for your controller below.
 // The IP address will be dependent on your local network:
@@ -19,7 +21,7 @@ byte Ethernet::buffer[500];
 BufferFiller bfill;
 
 // S0 counter
-long E_PV = 0; // Wh
+long E_PV = E_PV_RESTORE; // Wh
 int P_PV[BUFFER]; // W
 
 int S0_prev_state = 1;
@@ -28,7 +30,7 @@ unsigned long last_pulse = 0;
 bool first_pulse = true;
 
 // Water counter
-long H2O = 0; // liter
+long H2O = H20_RESTORE; // liter
 int H2O_prev_state = 0;
 int H2O_pin = 6;
 
