@@ -6,8 +6,8 @@ Ethernet shield attached to pins 10, 11, 12, 13
 #include <EtherCard.h>
 
 #define BUFFER 5
-#define E_PV_RESTORE 435945
-#define H20_RESTORE 14490
+#define E_PV_RESTORE 457149
+#define H20_RESTORE 15069
 
 // Enter a MAC address and IP address for your controller below.
 // The IP address will be dependent on your local network:
@@ -232,7 +232,7 @@ void loop() {
             "Connection: close\r\n"
             "\r\n"
             "{\"H2O\": $D}"),H2O);
-          } else if (command == "debug") {
+          } else if (command == "S0") {
             bfill.emit_p(PSTR(
             "HTTP/1.0 200 OK\r\n"
             "Content-Type: text/json\r\n"
