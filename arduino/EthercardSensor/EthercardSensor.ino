@@ -83,8 +83,9 @@ void S0_read(void) {
   // Compute time difference
   delta_t_ms = millis()-last_pulse; // ms
 
-  // Potential fix
-  /*
+  // Minimum 'real' production is 30W = 2 pulses per minute
+  // So if more then 1 minutes passes without a pulse:
+  // Flush the buffer and reset delta timer
   if(first_pulse == false)
   {
     if (delta_t_ms > 60000)
@@ -101,7 +102,6 @@ void S0_read(void) {
       return;
     }
   }
-  */
 
   if(S0_prev_state == 1)
   {
@@ -129,23 +129,6 @@ void S0_read(void) {
       last_pulse = millis();
     }
   } 
-  else 
-  { // Minimum 'real' production is 30W = 2 pulses per minute
-    // So if more then 1 minutes passes without a pulse:
-    // Flush the buffer and reset delta timer
-    if(first_pulse == false)
-    {
-      if (delta_t_ms > 60000)
-      {
-        // Flush the buffer
-        for (int n = 0; n < BUFFER; n++) {
-          P_PV[n] = 0;
-        }
-        // Reset delta timer by toggling first_pulse bit
-        first_pulse = true;
-      }
-    }
-  }
 
   S0_prev_state = S0_cur_state;
 }
