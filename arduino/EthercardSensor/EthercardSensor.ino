@@ -83,6 +83,26 @@ void S0_read(void) {
   // Compute time difference
   delta_t_ms = millis()-last_pulse; // ms
 
+  // Potential fix
+  /*
+  if(first_pulse == false)
+  {
+    if (delta_t_ms > 60000)
+    {
+      // Flush the buffer
+      for (int n = 0; n < BUFFER; n++) {
+        P_PV[n] = 0;
+      }
+      // Reset delta timer by toggling first_pulse bit
+      first_pulse = true;
+      // Record the current state
+      S0_prev_state = S0_cur_state;
+      // Exit the function
+      return;
+    }
+  }
+  */
+
   if(S0_prev_state == 1)
   {
     if (S0_cur_state == 0)
@@ -229,6 +249,15 @@ void loop() {
             "Connection: close\r\n"
             "\r\n"
             "{\"H2O\": $D}"),H2O);
+          } else if (command == "debug") {
+            bfill.emit_p(PSTR(
+            "HTTP/1.0 200 OK\r\n"
+            "Content-Type: text/json\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            "{\"S0_prev_state\": $D,"
+            "\"last_pulse\": $L,"
+            "\"first_pulse\": $D}"),S0_prev_state,last_pulse,first_pulse);
           } else {
             bfill.emit_p(PSTR(
             "HTTP/1.0 400 Unknown variable\r\n"
