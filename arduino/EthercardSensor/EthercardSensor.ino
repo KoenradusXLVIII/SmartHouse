@@ -6,8 +6,12 @@ Ethernet shield attached to pins 10, 11, 12, 13
 #include <EtherCard.h>
 
 #define BUFFER 5
-#define E_PV_RESTORE 457149
-#define H20_RESTORE 15069
+#define E_PV_RESTORE 457149         // Wh
+#define H20_RESTORE 15069           // l
+#define MIN_PV_POWER 10             // W
+#define MS_PER_HOUR 3600000  
+#define SERIAL_SPEED 9600
+#define HTTP_MAX_LINE_LENGTH 100
 
 // Enter a MAC address and IP address for your controller below.
 // The IP address will be dependent on your local network:
@@ -20,14 +24,17 @@ static byte myip[] = { 192,168,1,113 };
 byte Ethernet::buffer[500];
 BufferFiller bfill;
 
-// S0 counter
+// Energy and power variables
 long E_PV = E_PV_RESTORE; // Wh
 int P_PV[BUFFER]; // W
 
+// S0 counter
 int S0_prev_state = 1;
 int S0_pin = 7;
-unsigned long last_pulse = 0;
+unsigned long delta_t_ms = 0;
+unsigned long last_pulse = millis();
 bool first_pulse = true;
+unsigned long S0_timeout_ms = 3600 / MIN_PV_POWER * 1000;
 
 // Water counter
 long H2O = H20_RESTORE; // liter
@@ -36,7 +43,7 @@ int H2O_pin = 6;
 
 void setup() {
   // Open serial communications and wait for port to open:
-  Serial.begin(9600);
+  Serial.begin(SERIAL_SPEED);
   while (!Serial) {
     ; // wait for serial port to connect. Needed for native USB port only
   }
@@ -61,14 +68,11 @@ void setup() {
 
 void H2O_read(void) {
   int H2O_cur_state = digitalRead(H2O_pin);
-  //Serial.print("H2O state: ");
-  //Serial.println(H2O_cur_state);
 
   if(H2O_prev_state == 0)
   {
     if (H2O_cur_state == 1)
     { // Start of pulse detected
-      //Serial.println("liter");
       H2O += 1;
     }
   }
@@ -77,59 +81,29 @@ void H2O_read(void) {
 }
 
 void S0_read(void) {
+  // Read input pin
   int S0_cur_state = digitalRead(S0_pin);
-  unsigned long delta_t_ms;
-  
+
   // Compute time difference
   delta_t_ms = millis()-last_pulse; // ms
-
-  // Minimum 'real' production is 30W = 2 pulses per minute
-  // So if more then 1 minutes passes without a pulse:
-  // Flush the buffer and reset delta timer
-  if(first_pulse == false)
-  {
-    if (delta_t_ms > 60000)
-    {
-      // Flush the buffer
-      for (int n = 0; n < BUFFER; n++) {
-        P_PV[n] = 0;
-      }
-      // Reset delta timer by toggling first_pulse bit
-      first_pulse = true;
-      // Record the current state
-      S0_prev_state = S0_cur_state;
-      // Exit the function
-      return;
-    }
-  }
 
   if(S0_prev_state == 1)
   {
     if (S0_cur_state == 0)
     { // Start of pulse detected
       E_PV += 1;
-      if(first_pulse) {
-        first_pulse = false;
-      } else {
-        //Serial.print("Delta t in ms: ");
-        //Serial.println(delta_t_ms);
-        if (delta_t_ms > 0) { // Avoid devide by zero
-          // Rotate the buffer
-          for (int n = (BUFFER - 1); n > 0; n--) {
-            P_PV[n] = P_PV[n - 1];
-          }
-          // Computer PV power
-          P_PV[0] = 3600000 / delta_t_ms;
-          //Serial.print("Latest power in W: ");
-          //Serial.println(P_PV[0]);
-          //Serial.print("Average power in W: ");
-          //Serial.println(P_PV_average());
-        }        
-      }
+      if (delta_t_ms > 0) { // Avoid devide by zero
+        P_PV_add_rotate(MS_PER_HOUR / delta_t_ms);
       last_pulse = millis();
     }
   } 
 
+  // If no pulse within time-out window assume
+  // power below minimum power, write 0W to buffer
+  if (delta_t_ms > S0_timeout_ms)
+    P_PV_add_rotate(0);
+
+  // Store current S0 state for future reference
   S0_prev_state = S0_cur_state;
 }
 
@@ -149,11 +123,6 @@ void loop() {
     String command;
     boolean currentLineIsBlank = true;
 
-    //Serial.print("len: ");
-    //Serial.println(len);
-    //Serial.print("pos: ");
-    //Serial.println(pos);
-
     bfill = ether.tcpOffset();
     char *data = (char *) Ethernet::buffer + pos;
 
@@ -162,7 +131,7 @@ void loop() {
       char c = data[i];
 
       // Store the HTTP request line
-      if (readline.length() < 100) {
+      if (readline.length() < HTTP_MAX_LINE_LENGTH) {
         readline += c;
       }
 
@@ -239,8 +208,8 @@ void loop() {
             "Connection: close\r\n"
             "\r\n"
             "{\"S0_prev_state\": $D,"
-            "\"last_pulse\": $L,"
-            "\"first_pulse\": $D}"),S0_prev_state,last_pulse,first_pulse);
+            "\"delta_t_ms\": $L,"
+            "\"first_pulse\": $D}"),S0_prev_state,delta_t_ms,first_pulse);
           } else {
             bfill.emit_p(PSTR(
             "HTTP/1.0 400 Unknown variable\r\n"
@@ -275,6 +244,15 @@ void loop() {
   }
 }
 
+// Function to add new value to P_PV buffer and rotate
+void P_PV_add_rotate(int P0) {
+  for (int n = (BUFFER - 1); n > 0; n--) {
+    P_PV[n] = P_PV[n - 1];
+  }
+  P_PV[0] = P0;
+}
+
+// Function to compute average power
 int P_PV_average(void) {
   int average = 0;
 
