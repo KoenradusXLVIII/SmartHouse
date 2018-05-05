@@ -6,9 +6,10 @@ Ethernet shield attached to pins 10, 11, 12, 13
 #include <EtherCard.h>
 
 #define BUFFER 5
-#define E_PV_RESTORE 457149         // Wh
-#define H20_RESTORE 15069           // l
+#define E_PV_RESTORE 498105         // Wh
+#define H20_RESTORE 15940           // l
 #define MIN_PV_POWER 10             // W
+#define MAX_PV_POWER 2100           // W (2kW + 5% margin)
 #define MS_PER_HOUR 3600000  
 #define SERIAL_SPEED 9600
 #define HTTP_MAX_LINE_LENGTH 100
@@ -31,10 +32,11 @@ int P_PV[BUFFER]; // W
 // S0 counter
 int S0_prev_state = 1;
 int S0_pin = 7;
+unsigned long S0_timeout_ms = MS_PER_HOUR / MIN_PV_POWER;
 unsigned long delta_t_ms = 0;
-unsigned long last_pulse = millis();
+unsigned long min_delta_t_ms = MS_PER_HOUR / MAX_PV_POWER;
 bool first_pulse = true;
-unsigned long S0_timeout_ms = 3600 / MIN_PV_POWER * 1000;
+unsigned long last_pulse;
 
 // Water counter
 long H2O = H20_RESTORE; // liter
@@ -64,6 +66,9 @@ void setup() {
   for (int n = 0; n < BUFFER; n++) {
     P_PV[n] = 0;
   }
+
+  // Initialize last pulse timer
+  last_pulse = millis();
 }
 
 void H2O_read(void) {
@@ -92,7 +97,7 @@ void S0_read(void) {
     if (S0_cur_state == 0)
     { // Start of pulse detected
       E_PV += 1;
-      if (delta_t_ms > 0) { // Avoid devide by zero
+      if (delta_t_ms > min_delta_t_ms) // Avoid invalid power calculation
         P_PV_add_rotate(MS_PER_HOUR / delta_t_ms);
       last_pulse = millis();
     }
