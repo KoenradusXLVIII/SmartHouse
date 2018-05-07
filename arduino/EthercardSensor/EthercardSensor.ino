@@ -35,7 +35,6 @@ int S0_pin = 7;
 unsigned long S0_timeout_ms = MS_PER_HOUR / MIN_PV_POWER;
 unsigned long delta_t_ms = 0;
 unsigned long min_delta_t_ms = MS_PER_HOUR / MAX_PV_POWER;
-bool first_pulse = true;
 unsigned long last_pulse;
 
 // Water counter
@@ -213,8 +212,7 @@ void loop() {
             "Connection: close\r\n"
             "\r\n"
             "{\"S0_prev_state\": $D,"
-            "\"delta_t_ms\": $L,"
-            "\"first_pulse\": $D}"),S0_prev_state,delta_t_ms,first_pulse);
+            "\"delta_t_ms\": $L}"),S0_prev_state,delta_t_ms);
           } else {
             bfill.emit_p(PSTR(
             "HTTP/1.0 400 Unknown variable\r\n"
