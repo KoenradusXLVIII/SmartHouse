@@ -4,3 +4,4 @@ build-uno/
 *.pyc
 *.pickle
 python/pvoutput/data/
+python/pvoutput/config.yaml

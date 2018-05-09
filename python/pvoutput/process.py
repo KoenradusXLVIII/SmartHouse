@@ -7,6 +7,8 @@ import serial
 import urllib
 import json
 import sys
+import yaml
+import os
 from P1 import read_telegram
 from diff import diff
 
@@ -21,33 +23,26 @@ logger = logging.getLogger('pvoutput')
 logger.setLevel(log_level)
 logger.addHandler(handler)
 
-# Serial port configuration
-port = '/dev/ttyUSB0'
-baudrate = '115200'
-parity = 'N'
-bytesize = 8
-stopbits = 1
+# Load configuration YAML
+path = os.path.dirname(os.path.realpath(__file__))
+cfg = yaml.load(open(path + '/config.yaml','r'))
 
-# P1 configuration
-p1_retries = 5
+# Check command line parameters
+local = False           # Upload to PVOutput
+verbose = False         # Verbose output
+if(len(sys.argv) > 1):
+    if('v' in sys.argv[1]):
+        verbose = True
+    if('l' in sys.argv[1]):
+        local = True
 
 # Initialize variables
 try:
-    ser = serial.Serial(port, baudrate, bytesize, parity, stopbits)
+    logger.debug('Trying to open serial port %s at baudrate %s [%s/%d/%d]' % (cfg['serial']['port'],cfg['serial']['baudrate'],cfg['serial']['parity'],cfg['serial']['bytesize'],cfg['serial']['stopbits']))
+    ser = serial.Serial(cfg['serial']['port'], cfg['serial']['baudrate'], cfg['serial']['bytesize'], cfg['serial']['parity'], cfg['serial']['stopbits'])
 except:
-    logger.error('Unable to open serial port: %s' % port)
+    logger.error('Unable to open serial port %s at baudrate %s [%s/%d/%d]' % (cfg['serial']['port'],cfg['serial']['baudrate'],cfg['serial']['parity'],cfg['serial']['bytesize'],cfg['serial']['stopbits']))
     sys.exit()
-
-# Guardhouse configuration
-guardhouse_url = "http://192.168.1.112/all"
-
-# Mainhouse configuration
-mainhouse_url = "http://192.168.1.113/all"
-
-# PVOutput variables
-pvoutput_key="d1b62a7d17dbebf167b98df9eb2f7c2188438d78"
-pvoutput_sid="47507"
-pvoutput_url="http://pvoutput.org/service/r2/addstatus.jsp"
 
 def main():
     # Start new session
@@ -55,7 +50,8 @@ def main():
 
     # Get solar and water data
     try:
-        response = urllib.urlopen(mainhouse_url)
+        logger.debug('Accessing Main House web service at %s' % cfg['arduino_url']['mainhouse'])
+        response = urllib.urlopen(cfg['arduino_url']['mainhouse'])
         data_json = json.loads(response.read())
         E_PV = data_json['E_PV']
         P_PV = data_json['P_PV']
@@ -71,13 +67,14 @@ def main():
     E_net = -1
     P_net = -1
     itt = 0
-    while ((E_net < 0) and (itt < p1_retries)):
-        [P_net, E_net] = read_telegram(ser, logger, port)
-        print "Power: %s" % P_net
-        print "Energy: %s" % E_net
+    while ((E_net < 0) and (itt < cfg['p1']['retries'])):
+        [P_net, E_net] = read_telegram(ser, logger, cfg['serial']['port'])
+        if verbose:
+            print('Power: %s' % P_net)
+            print('Energy: %s' % E_net)
         itt += 1
 
-    if(itt == p1_retries): # No valid value received within maximum number of tries
+    if(itt == cfg['p1']['retries']): # No valid value received within maximum number of tries
         logger.error('No valid P1 data after %d retries' % itt-1)
         sys.exit()
 
@@ -87,23 +84,20 @@ def main():
 
     # Get extended data
     try:
-        response = urllib.urlopen(guardhouse_url)
+        logger.debug('Accessing Guard House web service at %s' % cfg['arduino_url']['mainhouse'])
+        response = urllib.urlopen(cfg['arduino_url']['guardhouse'])
         data_json = json.loads(response.read())
         temp = data_json['Temperature']
         humi = data_json['Humidity']
-        #door = data_json['Door state']
-        #light = data_json['Light state']
     except:
         logger.error('No data received from GuardHouse')
         temp = 0
         humi = 0
-        #door = 0
-        #light = 0
 
     #  Prepare PVOutput headers
     headers = {
-        'X-Pvoutput-Apikey': pvoutput_key,
-        'X-Pvoutput-SystemId' : pvoutput_sid
+        'X-Pvoutput-Apikey': cfg['pvoutput']['key'],
+        'X-Pvoutput-SystemId' : cfg['pvoutput']['sid']
     }
 
     # Prepare data
@@ -122,20 +116,15 @@ def main():
     logger.info('Temperature: %s' % temp)
     logger.info('Humidity: %s' % humi)
 
-    #logger.debug('Door State: Open' if(door) else 'Door State: Closed')
-    #logger.debug('Light State: On' if(door) else 'Light State: Off')
-
     # Prepare API data
-    #pvoutput_energy = pvoutput_url + '?d=%s&t=%s&v1=%s&v3=%s&v7=%s&v8=%s&v9=%s&c1=1' % (date_str,time_str,E_PV,E_cons,temp,humi,H2O)
-    pvoutput_energy = pvoutput_url + '?d=%s&t=%s&v1=%s&v2=%s&v3=%s&v4=%s&v7=%s&v8=%s&v9=%s&c1=1' % (date_str,time_str,E_PV,P_PV,E_cons,P_cons,temp,humi,H2O)
+    pvoutput_energy = cfg['pvoutput']['url'] + '?d=%s&t=%s&v1=%s&v2=%s&v3=%s&v4=%s&v7=%s&v8=%s&v9=%s&c1=1' % (date_str,time_str,E_PV,P_PV,E_cons,P_cons,temp,humi,H2O)
     logger.debug('Request: %s' % pvoutput_energy)
+    logger.debug('Headers: %s' % headers)
 
     # Upload
-    r = requests.post(pvoutput_energy,headers=headers)
-
-    # Logging
-    #logger.debug('Data received from Arduino: %s' % data_raw)
-    logger.debug('Energy data upload: %s' % r.content)
+    if not local:
+        r = requests.post(pvoutput_energy,headers=headers)
+        logger.debug('Energy data upload: %s' % r.content)
 
     logger.debug('=== END OF SESSION ===')
 
