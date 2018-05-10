@@ -1,18 +1,27 @@
-/*
-Ethernet shield attached to pins 10, 11, 12, 13
-*/
-
 #include <SPI.h>
 #include <Ethernet.h>
 #include <dht.h>
+#include <SHT1x.h>
 
+#define DEBUG
+
+// Pins [Pins 10 through 13 in use by Ethernet shield]
 #define DHT21_PIN 2
 #define DOOR_CONTACT_PIN 3
 #define LIGHT_RELAY_PIN 4
 #define LIGHT_OVERRIDE_PIN 5
 #define WATER_VALVE_PIN 6
 #define WATER_OVERRIDE_PIN 7
+#define RAIN_PIN_IN 8
+#define RAIN_PIN_OUT 9
+#define SHT10_DATA_PIN A0
+#define SHT10_CLK_PIN A1
+
+// Configuration
 #define BUFFER 64
+#define RAIN_CALIBRATION 3 // ml/pulse
+
+// Aliases
 #define CLOSED 0
 #define OPEN 1
 #define MANUAL 0
@@ -21,7 +30,6 @@ Ethernet shield attached to pins 10, 11, 12, 13
 #define ON 1
 #define TEMP 0
 #define HUMI 1
-#define LIGHT_SENSOR_PIN 0
 
 // Enter a MAC address and IP address for your controller below.
 // The IP address will be dependent on your local network:
@@ -34,28 +42,36 @@ IPAddress ip(192, 168, 1, 112);
 // with the IP address and port you want to use
 // (port 80 is default for HTTP):
 EthernetServer server(80);
+ 
+// Initialize SHT10
+// VCC - Brown - Red
+// GND - Black - Blue/Black
+// DAT - Yellow - Red/Yellow
+// CLK - Blue - Blue
+SHT1x sht10(SHT10_DATA_PIN, SHT10_CLK_PIN);
+
+// DHT sensor
+dht DHT;
 
 // Define variables
-  // DHT sensor
-  dht DHT;
   float buf_temp[BUFFER];
   float buf_humi[BUFFER];
   // Digital I/O variables
-  int cur_door_state = CLOSED;          // Default to closed
   int prev_door_state = CLOSED;         // Default to closed
   int light_state = OFF;                // Default to light off
-  int light_hard_override_state = AUTO; // Default to AUTO mode
   int light_soft_override_state = AUTO; // Default to AUTO mode 
   unsigned long close_time;
   bool timer_on = false;                // Default timer off
-  int light_delay = 30;                 // UOM: seconds
   int water_valve_state = OFF;          // Default to water off
   int water_hard_override_state = AUTO; // Default to AUTO mode  
   int water_soft_override_state = AUTO; // Default to AUTO mode
 
   // Light sensor
-  int light_intensity = 0;          // Default to darkness
-  int light_thresh = 512;           // 4.9mV per LSB, 0-5V 
+  int light_delay = 30000;          // 30000ms = 30s default
+
+  // Rain sensor
+  int prev_rain_state = HIGH;
+  unsigned long rain_meter = 0; // in ml
 
 void setup() {
   // Open serial communications and wait for port to open:
@@ -64,12 +80,17 @@ void setup() {
     ; // wait for serial port to connect. Needed for native USB port only
   }
 
-  // Initialze inputs
+  // Initialze pins
   pinMode(DOOR_CONTACT_PIN,INPUT);
   pinMode(LIGHT_RELAY_PIN,OUTPUT);
   pinMode(LIGHT_OVERRIDE_PIN,INPUT_PULLUP);
   pinMode(WATER_VALVE_PIN,OUTPUT);
   pinMode(WATER_OVERRIDE_PIN,INPUT_PULLUP);
+  pinMode(RAIN_PIN_OUT, OUTPUT);
+  pinMode(RAIN_PIN_IN, INPUT_PULLUP);
+
+  // Initialize output pin values
+  digitalWrite(RAIN_PIN_OUT, LOW);  
 
   // start the Ethernet connection and the server:
   Ethernet.begin(mac, ip);
@@ -87,6 +108,9 @@ void setup() {
     buf_humi[n] = DHT.humidity;
   }
   Serial.println(F("[DONE]"));
+
+  float soil_humi = sht10.readHumidity();
+  Serial.println(soil_humi);
 }
 
 void loop() {
@@ -101,53 +125,18 @@ void loop() {
   temp = read_filtered_DHT(buf_temp,TEMP);
   humi = read_filtered_DHT(buf_humi,HUMI);
 
-  // Sample analog I/O
-  light_intensity = analogRead(LIGHT_SENSOR_PIN);
-
-  // Process digital I/0
   // Light
-  cur_door_state = digitalRead(DOOR_CONTACT_PIN);
-  if((prev_door_state == OPEN) and (cur_door_state == CLOSED)) {
-    // Door was open and is now closed, start countdown
-    close_time = millis();
-    timer_on = true;
-  } else if ((prev_door_state == CLOSED) and (cur_door_state == CLOSED)) {
-    // Door was closed and is closed
-    if(timer_on) {
-      if ((millis() - close_time) > (light_delay * 1000)) {
-        // Timer has expired, turn light off
-        light_state = OFF;
-        timer_on = false;
-      }
-    }
-  } else { // cur_door_state == OPEN
-    // Door is open, ...
-    if(light_intensity < light_thresh) {
-      // ... and it is dark, turn light ON....
-      light_hard_override_state = digitalRead(LIGHT_OVERRIDE_PIN);
-      if ((light_hard_override_state == AUTO) and (light_soft_override_state == AUTO)) {
-        // ... if no override present.
-        light_state = ON;
-      } else {
-         // ... otherwise turn OFF
-        light_state = OFF;
-      }
-    }
-  }
-  digitalWrite(LIGHT_RELAY_PIN, light_state);    
-  prev_door_state = cur_door_state;
+  light_control();
   
   // Water
-  water_hard_override_state = digitalRead(WATER_OVERRIDE_PIN);
-  if ((water_hard_override_state == MANUAL) or (water_soft_override_state == MANUAL)) {
-    // Manual override on water, OPEN valve
-    water_valve_state = OPEN;
-  } else {
-    // Automatic process to be implemented
-    // For now just CLOSED water valve
-    water_valve_state = CLOSED;
-  }
-  digitalWrite(WATER_VALVE_PIN, water_valve_state);
+  water_control();
+
+  // Rain sensor
+  rain_sensor();
+
+  // Soil moisture sensor
+  float soil_humi = sht10.readHumidity();
+  Serial.println(soil_humi);
   
   // Processe ethernet clients
   EthernetClient client = server.available();
@@ -200,138 +189,92 @@ void loop() {
           // If a GET command is received execute
           // the request if the variable is known
           if (cmd_type == 'G'){
+            client.println(F("HTTP/1.1 200 OK"));
+            client.println(F("Content-Type: text/json"));
+            client.println(F("Connection: close"));
+            client.println();
             if (command == "all") {
-              client.println(F("HTTP/1.1 200 OK"));
-              client.println(F("Content-Type: text/json"));
-              client.println(F("Connection: close"));
-              client.println();
               client.print(F("{\"Temperature\":"));
               client.print(temp);
               client.print(F(", \"Humidity\":"));
               client.print(humi);
+              client.print(F(", \"Rain\":"));
+              client.print(rain_meter);  
+              client.print(F(", \"Soil Humidity\":"));
+              client.print(soil_humi);              
               client.print(F(", \"Door state\":"));
-              client.print(cur_door_state);
+              client.print(prev_door_state);
               client.print(F(", \"Light state\":"));
               client.print(light_state);
               client.print(F(", \"Light delay\":"));
               client.print(light_delay);
-              client.print(F(", \"Light intensity\":"));
-              client.print(light_intensity);
-              client.print(F(", \"Light threshold\":"));
-              client.print(light_thresh);
               client.println(F("}"));
             } else if (command == "door_state") {
-              client.println(F("HTTP/1.1 200 OK"));
-              client.println(F("Content-Type: text/json"));
-              client.println(F("Connection: close"));
-              client.println();
               client.print(F("{\"Door state\":"));
-              client.print(cur_door_state);
+              client.print(prev_door_state);
               client.println(F("}"));
             } else if (command == "temp") {
-              client.println(F("HTTP/1.1 200 OK"));
-              client.println(F("Content-Type: text/json"));
-              client.println(F("Connection: close"));
-              client.println();
               client.print(F("{\"Temperature\":"));
               client.print(temp);
               client.println(F("}"));
             } else if (command == "humi") {
-              client.println(F("HTTP/1.1 200 OK"));
-              client.println(F("Content-Type: text/json"));
-              client.println(F("Connection: close"));
-              client.println();
               client.print(F("{\"Humidity\":"));
               client.print(humi);
               client.println(F("}"));
+            } else if (command == "rain") {
+              client.print(F("{\"Rain\":"));
+              client.print(rain_meter);
+              client.println(F("}"));       
+            } else if (command == "soil_humi") {
+              client.print(F("{\"Soil Humidity\":"));
+              client.print(soil_humi);
+              client.println(F("}"));         
             } else if (command == "light_delay") {
-              client.println(F("HTTP/1.1 200 OK"));
-              client.println(F("Content-Type: text/json"));
-              client.println(F("Connection: close"));
-              client.println();
               client.print(F("{\"Light delay\":"));
               client.print(light_delay);
               client.println(F("}"));
             } else if (command == "light_state") {
-              client.println(F("HTTP/1.1 200 OK"));
-              client.println(F("Content-Type: text/json"));
-              client.println(F("Connection: close"));
-              client.println();
               client.print(F("{\"Light state\":"));
               client.print(light_state);
               client.println(F("}"));
-            } else if (command == "light_intensity") {
-              client.println(F("HTTP/1.1 200 OK"));
-              client.println(F("Content-Type: text/json"));
-              client.println(F("Connection: close"));
-              client.println();
-              client.print(F("{\"Light intensity\":"));
-              client.print(light_intensity);
-              client.println(F("}"));
-            } else if (command == "light_thresh") {
-              client.println(F("HTTP/1.1 200 OK"));
-              client.println(F("Content-Type: text/json"));
-              client.println(F("Connection: close"));
-              client.println();
-              client.print(F("{\"Light threshold\":"));
-              client.print(light_thresh);
-              client.println(F("}"));
             } else {
               // Unknown variable
-              client.println(F("HTTP/1.1 400 Unkown variable"));
-              client.println(F("Connection: close"));
+              client.println(F("Unkown variable"));
             }
           }
 
           // If a SET command is received execute
           // the request if the variable is known
           if (cmd_type == 'S'){
+            client.println(F("HTTP/1.1 200 OK"));
+            client.println(F("Content-Type: text/json"));
+            client.println(F("Connection: close"));
+            client.println();
             if (command == "light_delay") {
               if(cmd_value.toInt()) {
                 light_delay = cmd_value.toInt();
-
-                // Inform client
-                client.println(F("HTTP/1.1 200 OK"));
-                client.println(F("Content-Type: text/json"));
-                client.println(F("Connection: close"));
-                client.println();
-                client.print(F("{\"Light delay\":"));
-                client.print(light_delay);
-                client.println(F("}"));
               } else {
                 // Invalid SET parameter received
-                client.println(F("HTTP/1.1 400 Invalid parameter"));
-                client.println(F("Connection: close"));
+                client.println(F("Invalid parameter"));
+                client.println();
               }
-            } else if (command == "light_thresh") {
-              if(cmd_value.toInt()) {
-                light_thresh = cmd_value.toInt();
 
-                // Inform client
-                client.println(F("HTTP/1.1 200 OK"));
-                client.println(F("Content-Type: text/json"));
-                client.println(F("Connection: close"));
-                client.println();
-                client.print(F("{\"Light threshold\":"));
-                client.print(light_thresh);
-                client.println(F("}"));
-              } else {
-                // Invalid SET parameter received
-                client.println(F("HTTP/1.1 400 Invalid parameter"));
-                client.println(F("Connection: close"));
-              }  
+              // Inform client
+              client.print(F("{\"Light delay\":"));
+              client.print(light_delay);
+              client.println(F("}"));
             } else if (command == "light_mode") {
               if(cmd_value == "auto") {
                 light_soft_override_state = AUTO;
               } else if (cmd_value == "manual") {
                 light_soft_override_state = MANUAL;
+              } else {
+                // Invalid SET parameter received
+                client.println(F("Invalid parameter"));
+                client.println();
               }
               
               // Inform client
-              client.println(F("HTTP/1.1 200 OK"));
-              client.println(F("Content-Type: text/json"));
-              client.println(F("Connection: close"));
-              client.println();
               client.print(F("{\"Light mode\":"));
               client.print(light_soft_override_state);
               client.println(F("}"));
@@ -340,20 +283,20 @@ void loop() {
                 water_soft_override_state = AUTO;
               } else if (cmd_value == "manual") {
                 water_soft_override_state = MANUAL;
+              } else {
+                // Invalid SET parameter received
+                client.println(F("Invalid parameter"));
+                client.println();
               }
               
               // Inform client
-              client.println(F("HTTP/1.1 200 OK"));
-              client.println(F("Content-Type: text/json"));
-              client.println(F("Connection: close"));
-              client.println();
               client.print(F("{\"Water mode\":"));
               client.print(water_soft_override_state);
               client.println(F("}"));
             } else {
               // Invalid SET parameter received
-              client.println(F("HTTP/1.1 400 Invalid parameter"));
-              client.println(F("Connection: close"));
+              client.println(F("Invalid parameter"));
+              client.println();
             }
           }
           break;
@@ -384,6 +327,68 @@ void loop() {
     client.stop();
     Serial.println(F("[DONE]"));
   }
+}
+
+void rain_sensor(void)
+{
+  // Read input pin
+  int cur_rain_state = digitalRead(RAIN_PIN_IN);
+  if ((cur_rain_state == LOW) and (prev_rain_state == HIGH)) {
+    // Start of pulse detected
+    rain_meter += RAIN_CALIBRATION;
+    #ifdef DEBUG
+      Serial.print("Rain: ");
+      Serial.print(rain_meter);
+      Serial.println(" ml");
+    #endif
+  }
+
+  // Store current rain state for future reference
+  prev_rain_state = cur_rain_state;  
+}
+
+void water_control(void)
+{
+  int water_hard_override_state = digitalRead(WATER_OVERRIDE_PIN);
+  if ((water_hard_override_state == MANUAL) or (water_soft_override_state == MANUAL)) {
+    // Manual override on water, set valve to OPEN
+    water_valve_state = OPEN;
+  } else {
+    // Automatic mode, set valve to CLOSED
+    water_valve_state = CLOSED;
+  }
+  digitalWrite(WATER_VALVE_PIN, water_valve_state);
+}
+
+void light_control(void)
+{
+  int cur_door_state = digitalRead(DOOR_CONTACT_PIN);
+  if((prev_door_state == OPEN) and (cur_door_state == CLOSED)) {
+    // Door was open and is now closed, start countdown
+    close_time = millis();
+    timer_on = true;
+  } else if ((prev_door_state == CLOSED) and (cur_door_state == CLOSED)) {
+    // Door was closed and is closed
+    if(timer_on) {
+      if ((millis() - close_time) > (light_delay)) {
+        // Timer has expired, turn light off
+        light_state = OFF;
+        timer_on = false;
+      }
+    }
+  } else { // cur_door_state == OPEN
+    // Door is open, ...
+    int light_hard_override_state = digitalRead(LIGHT_OVERRIDE_PIN);
+    if ((light_hard_override_state == AUTO) and (light_soft_override_state == AUTO)) {
+      // ... if no override present.
+      light_state = ON;
+    } else {
+       // ... otherwise turn OFF
+      light_state = OFF;
+    }
+  }
+  digitalWrite(LIGHT_RELAY_PIN, light_state);    
+  prev_door_state = cur_door_state;
 }
 
 float read_filtered_DHT(float *buf_data, int sensor) {

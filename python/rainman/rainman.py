@@ -79,6 +79,10 @@ if (hour == 6) or (force):
         data_json = json.loads(response.read())
     except:
         logger.error('No data received from Weather Underground')
+    	# Write forecast to file
+        with open('sprinkler.pickle', 'w') as fp:
+            # Write 'safe' values to pickle file (no sprinkling)
+            pickle.dump([0,0,0,0,'off',0,[]], fp)
         sys.exit()
 
     # Get yesterdays precipitation from file
@@ -150,6 +154,8 @@ if (hour == 6) or (force):
 
 with open('sprinkler.pickle') as fp:
     today_high_temp, qpf_allday,qpf_yesterday,lim_days_ahead,sprinkler_mode,sprinkler_duration,sprinkler_times = pickle.load(fp)
+
+print sprinkler_times
 
 if (hour in sprinkler_times):
     try:

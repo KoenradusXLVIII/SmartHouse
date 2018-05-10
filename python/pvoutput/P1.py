@@ -6,7 +6,6 @@ def read_telegram(ser, logger, port):
     # Smart meter configuration
     serial_number = 'XMX5LGBBFG1009050373'
     eot_char = '!' # End of transmission character
-    CRC_length = 4 # 4 byte hexadecimal CRC16 value
     telegram_length = 23 # lines
     OBIS = [
         ['Energy import [low]','1-0:1.8.1','(\d-\d):(\d\.?)+\((\d{6}\.\d{3})\*kWh\)'],
@@ -24,33 +23,36 @@ def read_telegram(ser, logger, port):
 
     # Start receiving raw data
     try:
+        logger.debug('Trying to read from serial port: %s' % port)
         data_raw = str(ser.readline())
     except:
         logger.error('Unable to read from serial port: %s' % port)
         sys.exit()
 
+    # Find start of transmission [serial number]
     while (serial_number not in data_raw):
         try:
+            logger.debug('Trying to read from serial port: %s' % port)
             data_raw = str(ser.readline())
         except:
             logger.error('Unable to read from serial port: %s' % port)
             sys.exit()
         itt += 1
+        logger.trace('Telegram line(s) read: %d' % itt)
         if (itt >= telegram_length):
-            logger.warning('Invalid telegram')
+            logger.error('Invalid telegram [serial number not found]')
             return -1
-
     # Start of transmission detected
     logger.debug('Start of transmission detected')
     data.append(data_raw.strip())
-    logger.debug('Data received: %s' % data_raw.strip())
+    logger.trace('[P1]: %s' % data_raw.strip())
     CRC_data += data_raw
 
-    # Read appropriate amount of lines
+    # Read until end of telegram character detected
     while (data_raw.startswith(eot_char) == False):
         try:
             data_raw = str(ser.readline())
-            logger.debug('[P1]: %s' % data_raw.strip())
+            logger.trace('[P1]: %s' % data_raw.strip())
         except:
             logger.error('Unable to read from serial port: %s' % port)
             sys.exit()

@@ -89,10 +89,14 @@ def main():
         data_json = json.loads(response.read())
         temp = data_json['Temperature']
         humi = data_json['Humidity']
+        rain = data_json['Rain']
+        soil_humi = data_json['Soil Humidity']
     except:
         logger.error('No data received from GuardHouse')
         temp = 0
         humi = 0
+        rain = 0
+        soil_humi = 0
 
     #  Prepare PVOutput headers
     headers = {
@@ -113,11 +117,13 @@ def main():
     logger.debug('Energy Net Import: %s Wh' % E_net)
     logger.debug('Energy Consumption: %s Wh' % E_cons)
     logger.info('Water Consumption: %s liter' % H2O)
-    logger.info('Temperature: %s' % temp)
-    logger.info('Humidity: %s' % humi)
+    logger.info('Temperature: %s C' % temp)
+    logger.info('Humidity: %s %%' % humi)
+    logger.info('Rain: %s ml' % rain)
+    logger.info('Soil Humidity: %s %%' % soil_humi)
 
     # Prepare API data
-    pvoutput_energy = cfg['pvoutput']['url'] + '?d=%s&t=%s&v1=%s&v2=%s&v3=%s&v4=%s&v7=%s&v8=%s&v9=%s&c1=1' % (date_str,time_str,E_PV,P_PV,E_cons,P_cons,temp,humi,H2O)
+    pvoutput_energy = cfg['pvoutput']['url'] + '?d=%s&t=%s&v1=%s&v2=%s&v3=%s&v4=%s&v7=%s&v8=%s&v9=%s&v11=%s&v12=%s&c1=1' % (date_str,time_str,E_PV,P_PV,E_cons,P_cons,temp,humi,H2O,rain,soil_humi)
     logger.debug('Request: %s' % pvoutput_energy)
     logger.debug('Headers: %s' % headers)
 

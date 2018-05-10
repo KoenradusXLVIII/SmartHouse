@@ -5,3 +5,4 @@ build-uno/
 *.pickle
 python/pvoutput/data/
 python/pvoutput/config.yaml
+python/SonarCloud.bat
