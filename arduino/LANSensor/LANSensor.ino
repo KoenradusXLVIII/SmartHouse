@@ -12,10 +12,11 @@
 #define LIGHT_OVERRIDE_PIN 5
 #define WATER_VALVE_PIN 6
 #define WATER_OVERRIDE_PIN 7
-#define RAIN_PIN_IN 8
-#define RAIN_PIN_OUT 9
+#define RAIN_IN_PIN 8
+#define RAIN_OUT_PIN 9
 #define SHT10_DATA_PIN A0
 #define SHT10_CLK_PIN A1
+#define LIGHT_SENSOR_PIN A2
 
 // Configuration
 #define BUFFER 64
@@ -30,6 +31,8 @@
 #define ON 1
 #define TEMP 0
 #define HUMI 1
+#define LIGHT 0
+#define DARK 1
 
 // Enter a MAC address and IP address for your controller below.
 // The IP address will be dependent on your local network:
@@ -86,11 +89,12 @@ void setup() {
   pinMode(LIGHT_OVERRIDE_PIN,INPUT_PULLUP);
   pinMode(WATER_VALVE_PIN,OUTPUT);
   pinMode(WATER_OVERRIDE_PIN,INPUT_PULLUP);
-  pinMode(RAIN_PIN_OUT, OUTPUT);
-  pinMode(RAIN_PIN_IN, INPUT_PULLUP);
+  pinMode(RAIN_OUT_PIN, OUTPUT);
+  pinMode(RAIN_IN_PIN, INPUT_PULLUP);
+  pinMode(LIGHT_SENSOR_PIN, INPUT);
 
   // Initialize output pin values
-  digitalWrite(RAIN_PIN_OUT, LOW);  
+  digitalWrite(RAIN_OUT_PIN, LOW);  
 
   // start the Ethernet connection and the server:
   Ethernet.begin(mac, ip);
@@ -332,7 +336,7 @@ void loop() {
 void rain_sensor(void)
 {
   // Read input pin
-  int cur_rain_state = digitalRead(RAIN_PIN_IN);
+  int cur_rain_state = digitalRead(RAIN_IN_PIN);
   if ((cur_rain_state == LOW) and (prev_rain_state == HIGH)) {
     // Start of pulse detected
     rain_meter += RAIN_CALIBRATION;
@@ -363,6 +367,8 @@ void water_control(void)
 void light_control(void)
 {
   int cur_door_state = digitalRead(DOOR_CONTACT_PIN);
+  int light_sensor = digitalRead(LIGHT_SENSOR_PIN);
+  
   if((prev_door_state == OPEN) and (cur_door_state == CLOSED)) {
     // Door was open and is now closed, start countdown
     close_time = millis();
@@ -379,8 +385,10 @@ void light_control(void)
   } else { // cur_door_state == OPEN
     // Door is open, ...
     int light_hard_override_state = digitalRead(LIGHT_OVERRIDE_PIN);
-    if ((light_hard_override_state == AUTO) and (light_soft_override_state == AUTO)) {
-      // ... if no override present.
+    if (light_state == ON)
+      light_sensor = DARK;
+    if ((light_hard_override_state == AUTO) and (light_soft_override_state == AUTO) and (light_sensor == DARK)) {
+      // ... if no overrides present.
       light_state = ON;
     } else {
        // ... otherwise turn OFF
