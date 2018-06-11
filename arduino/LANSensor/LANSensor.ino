@@ -204,6 +204,7 @@ void loop() {
               client.print(humi);
               client.print(F(", \"Rain\":"));
               client.print(rain_meter);  
+              rain_meter = 0; // Rain meter read, so reset
               client.print(F(", \"Soil Humidity\":"));
               client.print(soil_humi);              
               client.print(F(", \"Door state\":"));
@@ -228,7 +229,8 @@ void loop() {
             } else if (command == "rain") {
               client.print(F("{\"Rain\":"));
               client.print(rain_meter);
-              client.println(F("}"));       
+              client.println(F("}"));
+              rain_meter = 0; // Rain meter read, so reset       
             } else if (command == "soil_humi") {
               client.print(F("{\"Soil Humidity\":"));
               client.print(soil_humi);

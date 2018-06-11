@@ -5,11 +5,6 @@
 
 // Defines
 #define SEVENTY_YEARS 2208988800UL
-#define SECS_PER_HOUR 3600 
-#define SECS_PER_DAY 86400
-#define SECS_PER_MIN 60
-#define DAYS_PER_WEEK 7
-#define EPOCH_DAY_OF_WEEK 4                       // 1st of January 1970 was a Thursday
 
 // WiFi settings
 int status = WL_IDLE_STATUS;
@@ -24,8 +19,7 @@ WiFiUDP Udp;                                      // A UDP instance to let us se
 IPAddress timeServerPool;
 const int NTP_PACKET_SIZE = 48;                   // NTP time stamp is in the first 48 bytes of the message
 byte packetBuffer[ NTP_PACKET_SIZE];              // A buffer to hold incoming and outgoing packets
-const unsigned long seventyYears = 2208988800UL;  // Offset between NTP and UNIX time (1 Jan 1900 vs 1970)
-const int timeZone = 1;                           // Central European Time
+int timeZone = 2;                                 // Central European Time with DTS (GMT+2)
 
 void setup() {
   // Open serial communications and wait for port to open:
@@ -60,77 +54,111 @@ void setup() {
   Serial.print("NTP NL pool server IP: ");
   Serial.println(timeServerPool);
 
+  // Start UDP communication
   Udp.begin(localPort);
+
+  // Initialize time and DTS
+  unsigned long epoch = readNtpPacket();        // Read an NTP packet from a time server
+  epoch = checkDts(epoch);
+  setTime(epoch);
 }
 
 void loop() {
-  sendNTPpacket(timeServerPool);                // Send an NTP packet to a time server
-  delay(1000);                                  // Wait for response
-
-  if(Udp.parsePacket())                         // Parse the UDP packet
-  {
-    Udp.read(packetBuffer, NTP_PACKET_SIZE);    // Read the packet into the buffer
-    unsigned long epoch = readNtpPacket();
-    print_time(epoch);
-  }
-
-  delay(10000);
+  cron(now()); 
 }
 
-void print_time(unsigned long epoch) {
+void print_time(unsigned long t) {
   // print the hour, minute and second:
   Serial.print("The UTC time is ");       // UTC is the time at Greenwich Meridian (GMT)
-  Serial.print(unix_time('h',epoch));
+  Serial.print(hour(t));
   Serial.print(':');
-  if (unix_time('m',epoch) < 10) {
+  if (minute(t) < 10) {
     // In the first 10 minutes of each hour, we'll want a leading '0'
     Serial.print('0');
   }
-  Serial.print(unix_time('m',epoch));
+  Serial.print(minute(t));
   Serial.print(':');
-  if (unix_time('s',epoch) < 10) {
+  if (second(t) < 10) {
     // In the first 10 seconds of each minute, we'll want a leading '0'
     Serial.print('0');
   }
-  Serial.println(unix_time('s',epoch)); // print the second  
+  Serial.println(second(t)); // print the second  
+
+  Serial.print("The UTC date is ");
+  if (day(t) < 10) {
+    // In the first 10 minutes of each hour, we'll want a leading '0'
+    Serial.print('0');
+  }
+  Serial.print(day(t));
+  Serial.print('-');
+  if (month(t) < 10) {
+    // In the first 10 seconds of each minute, we'll want a leading '0'
+    Serial.print('0');
+  }
+  Serial.print(month(t)); // print the second    
+  Serial.print('-');
+  Serial.println(year(t));
 }
 
-int unix_time(char mode, unsigned long epoch) {
-  switch(mode) {
-    case 'h': // Hour
-      return (epoch  % SECS_PER_DAY) / SECS_PER_HOUR;
-      break;
-    case 'm': // Minute
-      return (epoch  % SECS_PER_HOUR) / SECS_PER_MIN;
-      break;
-    case 's': // Second
-      return epoch % SECS_PER_MIN;
-      break;
-    default:
-      return 0;  
+void cron(unsigned long t) {
+  // m h dom m dow command
+
+  // Cron run timer
+  unsigned long tStart = millis();
+  
+  // 0 2 * * 0 Check for DTS update every Sunday at 02:00
+  if((weekday(t)==1) and (hour(t)==2) and (minute(t)==0) and (second(t) == 0)) {
+    checkDts(t);
+  }
+
+  // 0 0 * * * Sync with NTP server every day at 00:00
+  if((minute(t)==0) and (second(t) == 0)) { //(hour(t)==0) and 
+    print_time(now());
+    Serial.println("NTP resync");
+    t = readNtpPacket();        // Read an NTP packet from a time server
+    setTime(t);
+    print_time(now());    
+  }
+
+  // * * * * * Print time to serial port every minute
+  if(second(t) == 0) {
+    print_time(now());
+  }
+
+  // Only execute commands once every second
+  if((millis() - tStart) < 1000) {
+    delay(1000);
   }
 }
 
-int unix_date(char mode, unsigned long epoch) {
-  switch(mode) {
-    case 'd': // Day
-      return epoch  / SECS_PER_DAY;
-      break;
-    case 'm': // Month
-      return (epoch  % 3600) / 60;
-      break;
-    case 'y': // Year
-      return epoch % 60;
-      break;
-    case 'w': // Day of week
-      return ((epoch / SECS_PER_DAY)+EPOCH_DAY_OF_WEEK) % DAYS_PER_WEEK;
-      break;
-    default:
-      return 0;  
-  }   
+unsigned long checkDts(unsigned long t) {
+  if((month(t) > 3) or (month(t) < 10)) {   // Summer time from end of March to end of October
+    return t;
+  }
+  if((month(t) == 3) and (day(t) >= 25)) {  // Check for last Sunday in March
+    if((day(t) - weekday(t)) >= 24) {       // Last Sunday of March has passed
+      return t;
+    }
+  }
+  if((month(t) == 10) and (day(t) >= 25)) { // Check for last Sunday in October
+    if((day(t) - weekday(t)) < 24) {        // Last Sunday of October has not passed
+      return t;
+    }  
+  }
+
+  timeZone = 1;                             // Winter time: GMT+1
+  return (t - SECS_PER_HOUR); 
 }
 
 unsigned long readNtpPacket() {
+  // Send an NTP packet to a time server
+  sendNTPpacket(timeServerPool);                
+  delay(2000);
+
+  if(Udp.parsePacket()) {
+    // Read the packet into the buffer
+    Udp.read(packetBuffer, NTP_PACKET_SIZE);    
+
     // The timestamp starts at byte 40 of the received packet and is four bytes (two words) long
     unsigned long highWord = word(packetBuffer[40], packetBuffer[41]);
     unsigned long lowWord = word(packetBuffer[42], packetBuffer[43]);
@@ -140,6 +168,7 @@ unsigned long readNtpPacket() {
 
     // Convert NTP time into UNIX time
     return secsSince1900 - SEVENTY_YEARS + timeZone * SECS_PER_HOUR;
+  }
 }
 
 // send an NTP request to the time server at the given address
