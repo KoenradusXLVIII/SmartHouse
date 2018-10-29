@@ -8,3 +8,6 @@ python/pvoutput/data/
 python/SonarCloud.bat
 .scannerwork
 arduino/NTPWifi/config.h
+.idea/
+*.back
+*.json

@@ -13,7 +13,6 @@ from P1 import read_telegram
 from diff import diff
 
 # Set up logging
-log_level = logging.INFO
 handler = logging.handlers.SysLogHandler(address = '/dev/log')
 formatter = logging.Formatter('%(name)s [%(levelname)s] %(message)s')
 handler.setLevel(log_level)
@@ -32,7 +31,6 @@ local = False           # Upload to PVOutput
 verbose = False         # Verbose output
 if(len(sys.argv) > 1):
     if('v' in sys.argv[1]):
-        verbose = True
     if('l' in sys.argv[1]):
         local = True
 
@@ -67,7 +65,7 @@ def main():
     E_net = -1
     P_net = -1
     itt = 0
-    while ((E_net < 0) and (itt < cfg['p1']['retries'])):
+    while ((E_net == -1) and (itt < cfg['p1']['retries'])):
         [P_net, E_net] = read_telegram(ser, logger, cfg['serial']['port'])
         if verbose:
             print('Power: %s' % P_net)
