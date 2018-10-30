@@ -11,3 +11,4 @@ arduino/NTPWifi/config.h
 .idea/
 *.back
 *.json
+*.csv
