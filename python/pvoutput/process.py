@@ -1,8 +1,6 @@
-import logging
 import logging.handlers
 import requests
 import datetime
-import time
 import serial
 import urllib
 import json
@@ -13,6 +11,7 @@ from P1 import read_telegram
 from diff import diff
 
 # Set up logging
+log_level = logging.INFO
 handler = logging.handlers.SysLogHandler(address = '/dev/log')
 formatter = logging.Formatter('%(name)s [%(levelname)s] %(message)s')
 handler.setLevel(log_level)
@@ -31,6 +30,7 @@ local = False           # Upload to PVOutput
 verbose = False         # Verbose output
 if(len(sys.argv) > 1):
     if('v' in sys.argv[1]):
+	    verbose = True
     if('l' in sys.argv[1]):
         local = True
 
