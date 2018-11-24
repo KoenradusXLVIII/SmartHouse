@@ -6,7 +6,7 @@ class client:
         self.user = user
         self.url = url
 
-    def message(self, message, attachment):
+    def message(self, message, attachment=''):
         r = requests.post(self.url,
                 data={
                     "token": self.token,
