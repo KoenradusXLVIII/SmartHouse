@@ -5,15 +5,16 @@ class client:
         self.token = token
         self.user = user
         self.url = url
+        self.prio = {'lowest':-2,'low':-1,'normal':0,'high':1}
 
-    def message(self, message, attachment='', title='', priority=0, sound=''):
+    def message(self, message, attachment='', title='', priority='normal', sound=''):
         r = requests.post(self.url,
                 data={
                     "token": self.token,
                     "user": self.user,
                     "message": message,
                     "title": title,
-                    "priority": priority,
+                    "priority": self.prio[priority],
                     "sound": sound
                 },
                 files={

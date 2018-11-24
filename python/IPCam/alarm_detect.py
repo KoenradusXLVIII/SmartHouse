@@ -49,9 +49,9 @@ def main():
                 logger.warning('Alarm triggered!')
                 snap = snapshot()
                 if snap:
-                    pushover.message('Alarm triggered!', snapshot(), 'GuardHouse Security', cfg['pushover']['priority']['high'], 'alien')
+                    pushover.message('Alarm triggered!', snapshot(), 'GuardHouse Security', 'high', 'alien')
                 else:
-                    pushover.message('Alarm triggered, but unable to capture snapshot', '', 'GuardHouse Security', cfg['pushover']['priority']['high'], 'alien')
+                    pushover.message('Alarm triggered, but unable to capture snapshot', '', 'GuardHouse Security', 'high', 'alien')
             lastMotionState = motionDetectAlarm
 
     logger.error('Foscam and Pushover monitoring scripts de-activated.')
