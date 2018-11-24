@@ -27,6 +27,9 @@ pushover.message('Hello world!')
 # Send message with image attachment
 fp = open('randomimage.jpg', 'rb')
 pushover.message('Look at this cool picture!',fp)
+
+# Send high priority message with custom title (without attachment)
+pushover.message('Important message!','','Help!',cfg['pushover']['priority']['high'])
 ```
 
 ## Configuration file example
