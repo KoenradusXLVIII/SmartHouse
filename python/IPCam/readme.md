@@ -8,7 +8,7 @@ Upon detected motion this is forwarded to a smartphone by using the Pushover ser
 The configuration file is not included in the repository, because it contains sensitive data. 
 To make these scripts work, create a config.yaml file and use the following layout.
 
-```python
+```
 # Foscam configuration
 foscam:
   motor       :
