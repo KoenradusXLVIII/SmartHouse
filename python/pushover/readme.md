@@ -19,6 +19,7 @@ cfg = yaml.load(open(path + '/config.yaml','r'))
 # Create Pushover instance
 pushover = client(cfg['pushover']['token'], cfg['pushover']['user'], cfg['pushover']['url'])
 
+# Send message with image attachment
 fp = open('randomimage.jpg', 'rb')
 pushover.message('Look at this cool picture!',fp)
 ```
