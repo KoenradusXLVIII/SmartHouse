@@ -9,12 +9,11 @@ object as the *attachment* parameter.
 ```python
 # Import modules
 import yaml
-import os
 from pushover import client
 
 # Load configuration YAML
-path = os.path.dirname(os.path.realpath(__file__))
-cfg = yaml.load(open(path + '/config.yaml','r'))
+fp = open('config.yaml','r')
+cfg = yaml.load(fp)
 
 # Create Pushover instance
 pushover = client(cfg['pushover']['token'], cfg['pushover']['user'], cfg['pushover']['url'])

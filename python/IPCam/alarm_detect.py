@@ -1,5 +1,4 @@
 import requests
-import os
 import re
 import yaml
 import time
@@ -13,8 +12,8 @@ from io import BytesIO
 print('Running code on: {}'.format(platform.system()))
 
 # Load configuration YAML
-path = os.path.dirname(os.path.realpath(__file__))
-cfg = yaml.load(open(path + '/config.yaml','r'))
+fp = open('config.yaml','r')
+cfg = yaml.load(fp)
 
 # Set up Pushover
 pushover = client(cfg['pushover']['token'], cfg['pushover']['user'], cfg['pushover']['url'])

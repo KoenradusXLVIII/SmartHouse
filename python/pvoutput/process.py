@@ -6,7 +6,6 @@ import urllib
 import json
 import sys
 import yaml
-import os
 from P1 import read_telegram
 from diff import diff
 
@@ -22,8 +21,8 @@ logger.setLevel(log_level)
 logger.addHandler(handler)
 
 # Load configuration YAML
-path = os.path.dirname(os.path.realpath(__file__))
-cfg = yaml.load(open(path + '/config.yaml','r'))
+fp = open('config.yaml','r')
+cfg = yaml.load(fp)
 
 # Check command line parameters
 local = False           # Upload to PVOutput
