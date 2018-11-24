@@ -18,7 +18,7 @@ fp = open('config.yaml','r')
 cfg = yaml.load(fp)
 
 # Create Pushover instance
-pushover = client(cfg['pushover']['token'], cfg['pushover']['user'], cfg['pushover']['url'])
+pushover = client(cfg['pushover']['token'], cfg['pushover']['user'])
 
 # Send simple message
 pushover.message('Hello world!')
