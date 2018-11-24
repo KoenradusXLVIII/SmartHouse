@@ -35,8 +35,8 @@ pushover.message('Important message!','','Help!','high')
 The configuration file is not included in the repository, because it contains sensitive data. 
 To make these scripts work, create a config.yaml file and use the following layout.
 ```
+# Pushover authentication
 pushover:
-  url   : 'https://api.pushover.net/1/messages.json'
   token : 'YOUR API TOKEN HERE'
   user  : 'YOUR USER KEY HERE'
 ```
