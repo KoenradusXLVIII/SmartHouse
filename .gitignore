@@ -12,3 +12,4 @@ arduino/NTPWifi/config.h
 *.back
 *.json
 *.csv
+python/pushover/test_pushover.py
