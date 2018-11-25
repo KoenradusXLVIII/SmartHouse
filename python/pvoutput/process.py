@@ -8,80 +8,79 @@ import sys
 import yaml
 from P1 import read_telegram
 from diff import diff
+from logger import Logger
 
-# Set up logging
-log_level = logging.INFO
-handler = logging.handlers.SysLogHandler(address = '/dev/log')
-formatter = logging.Formatter('%(name)s [%(levelname)s] %(message)s')
-handler.setLevel(log_level)
-handler.setFormatter(formatter)
-# Create logging instance
-logger = logging.getLogger('pvoutput')
-logger.setLevel(log_level)
-logger.addHandler(handler)
+# Set up logger
+log_client = Logger('PVOutput', 'warning')
 
 # Load configuration YAML
-fp = open('config.yaml','r')
+fp = open('config.yaml', 'r')
 cfg = yaml.load(fp)
 
 # Check command line parameters
-local = False           # Upload to PVOutput
-verbose = False         # Verbose output
-if(len(sys.argv) > 1):
-    if('v' in sys.argv[1]):
-	    verbose = True
-    if('l' in sys.argv[1]):
+local = False  # Upload to PVOutput
+verbose = False  # Verbose output
+if (len(sys.argv) > 1):
+    if ('v' in sys.argv[1]):
+        verbose = True
+    if ('l' in sys.argv[1]):
         local = True
 
 # Initialize variables
 try:
-    logger.debug('Trying to open serial port %s at baudrate %s [%s/%d/%d]' % (cfg['serial']['port'],cfg['serial']['baudrate'],cfg['serial']['parity'],cfg['serial']['bytesize'],cfg['serial']['stopbits']))
-    ser = serial.Serial(cfg['serial']['port'], cfg['serial']['baudrate'], cfg['serial']['bytesize'], cfg['serial']['parity'], cfg['serial']['stopbits'])
+    log_client.debug('Trying to open serial port %s at baudrate %s [%s/%d/%d]' % (
+    cfg['serial']['port'], cfg['serial']['baudrate'], cfg['serial']['parity'], cfg['serial']['bytesize'],
+    cfg['serial']['stopbits']))
+    ser = serial.Serial(cfg['serial']['port'], cfg['serial']['baudrate'], cfg['serial']['bytesize'],
+                        cfg['serial']['parity'], cfg['serial']['stopbits'])
 except:
-    logger.error('Unable to open serial port %s at baudrate %s [%s/%d/%d]' % (cfg['serial']['port'],cfg['serial']['baudrate'],cfg['serial']['parity'],cfg['serial']['bytesize'],cfg['serial']['stopbits']))
+    log_client.error('Unable to open serial port %s at baudrate %s [%s/%d/%d]' % (
+    cfg['serial']['port'], cfg['serial']['baudrate'], cfg['serial']['parity'], cfg['serial']['bytesize'],
+    cfg['serial']['stopbits']))
     sys.exit()
+
 
 def main():
     # Start new session
-    logger.debug('=== START OF SESSION ===')
+    log_client.debug('=== START OF SESSION ===')
 
     # Get solar and water data
     try:
-        logger.debug('Accessing Main House web service at %s' % cfg['arduino_url']['mainhouse'])
+        log_client.debug('Accessing Main House web service at %s' % cfg['arduino_url']['mainhouse'])
         response = urllib.urlopen(cfg['arduino_url']['mainhouse'])
         data_json = json.loads(response.read())
         E_PV = data_json['E_PV']
         P_PV = data_json['P_PV']
         H2O = data_json['H2O']
-		# Post-process water data
+        # Post-process water data
         H2O = diff(H2O, 'H2O')
     except:
-        logger.error('No data received from Main House')
+        log_client.error('No data received from Main House')
         sys.exit()
 
     # Get P1 data
-	# Initialize variables
+    # Initialize variables
     E_net = -1
     P_net = -1
     itt = 0
-    while ((E_net == -1) and (itt < cfg['p1']['retries'])):
-        [P_net, E_net] = read_telegram(ser, logger, cfg['serial']['port'])
+    while (E_net == -1) and (itt < cfg['p1']['retries']):
+        [P_net, E_net] = read_telegram(ser, log_client, cfg['serial']['port'])
         if verbose:
             print('Power: %s' % P_net)
             print('Energy: %s' % E_net)
         itt += 1
 
-    if(itt == cfg['p1']['retries']): # No valid value received within maximum number of tries
-        logger.error('No valid P1 data after %d retries' % itt-1)
+    if itt == cfg['p1']['retries']:  # No valid value received within maximum number of tries
+        log_client.error('No valid P1 data after %d retries' % itt - 1)
         sys.exit()
 
     # Compute Power and Energy Consumption
-    E_cons = E_PV + E_net # v3
-    P_cons = P_PV + P_net # v4
+    E_cons = E_PV + E_net  # v3
+    P_cons = P_PV + P_net  # v4
 
     # Get extended data
     try:
-        logger.debug('Accessing Guard House web service at %s' % cfg['arduino_url']['mainhouse'])
+        log_client.debug('Accessing Guard House web service at %s' % cfg['arduino_url']['mainhouse'])
         response = urllib.urlopen(cfg['arduino_url']['guardhouse'])
         data_json = json.loads(response.read())
         temp = data_json['Temperature']
@@ -89,7 +88,7 @@ def main():
         rain = data_json['Rain']
         soil_humi = data_json['Soil Humidity']
     except:
-        logger.error('No data received from GuardHouse')
+        log_client.error('No data received from GuardHouse')
         temp = 0
         humi = 0
         rain = 0
@@ -98,7 +97,7 @@ def main():
     #  Prepare PVOutput headers
     headers = {
         'X-Pvoutput-Apikey': cfg['pvoutput']['key'],
-        'X-Pvoutput-SystemId' : cfg['pvoutput']['sid']
+        'X-Pvoutput-SystemId': cfg['pvoutput']['sid']
     }
 
     # Prepare data
@@ -106,30 +105,33 @@ def main():
     time_str = datetime.datetime.today().strftime('%H:%M')
 
     # Logging data
-    logger.debug('Date: %s' % date_str)
-    logger.debug('Time: %s' % time_str)
-    logger.info('Power Generation: %s W' % P_PV)
-    logger.info('Power Consumption: %s W' % P_cons)
-    logger.debug('Energy Generation: %s Wh' % E_PV)
-    logger.debug('Energy Net Import: %s Wh' % E_net)
-    logger.debug('Energy Consumption: %s Wh' % E_cons)
-    logger.info('Water Consumption: %s liter' % H2O)
-    logger.info('Temperature: %s C' % temp)
-    logger.info('Humidity: %s %%' % humi)
-    logger.info('Rain: %s ml' % rain)
-    logger.info('Soil Humidity: %s %%' % soil_humi)
+    log_client.debug('Date: %s' % date_str)
+    log_client.debug('Time: %s' % time_str)
+    log_client.info('Power Generation: %s W' % P_PV)
+    log_client.info('Power Consumption: %s W' % P_cons)
+    log_client.debug('Energy Generation: %s Wh' % E_PV)
+    log_client.debug('Energy Net Import: %s Wh' % E_net)
+    log_client.debug('Energy Consumption: %s Wh' % E_cons)
+    log_client.info('Water Consumption: %s liter' % H2O)
+    log_client.info('Temperature: %s C' % temp)
+    log_client.info('Humidity: %s %%' % humi)
+    log_client.info('Rain: %s ml' % rain)
+    log_client.info('Soil Humidity: %s %%' % soil_humi)
 
     # Prepare API data
-    pvoutput_energy = cfg['pvoutput']['url'] + '?d=%s&t=%s&v1=%s&v2=%s&v3=%s&v4=%s&v7=%s&v8=%s&v9=%s&v11=%s&v12=%s&c1=1' % (date_str,time_str,E_PV,P_PV,E_cons,P_cons,temp,humi,H2O,rain,soil_humi)
-    logger.debug('Request: %s' % pvoutput_energy)
-    logger.debug('Headers: %s' % headers)
+    pvoutput_energy = cfg['pvoutput']['url'] +\
+                      '?d=%s&t=%s&v1=%s&v2=%s&v3=%s&v4=%s&v7=%s&v8=%s&v9=%s&v11=%s&v12=%s&c1=1' % \
+                      (date_str, time_str, E_PV, P_PV, E_cons, P_cons, temp, humi, H2O, rain, soil_humi)
+    log_client.debug('Request: %s' % pvoutput_energy)
+    log_client.debug('Headers: %s' % headers)
 
     # Upload
     if not local:
-        r = requests.post(pvoutput_energy,headers=headers)
-        logger.debug('Energy data upload: %s' % r.content)
+        r = requests.post(pvoutput_energy, headers=headers)
+        log_client.debug('Energy data upload: %s' % r.content)
 
-    logger.debug('=== END OF SESSION ===')
+    log_client.debug('=== END OF SESSION ===')
+
 
 if __name__ == "__main__":
     main()

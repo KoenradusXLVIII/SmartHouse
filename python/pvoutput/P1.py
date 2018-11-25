@@ -52,7 +52,7 @@ def read_telegram(ser, logger, port):
     while (data_raw.startswith(eot_char) == False):
         try:
             data_raw = str(ser.readline())
-            logger.trace('[P1]: %s' % data_raw.strip())
+            logger.debug('[P1]: %s' % data_raw.strip())
         except:
             logger.error('Unable to read from serial port: %s' % port)
             sys.exit()

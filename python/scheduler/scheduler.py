@@ -1,7 +1,7 @@
 import schedule
 import time
 import requests
-from logger import Client
+import logger
 
 # Scheduler reference examples
 #  schedule.every(5).to(10).days.do(job)
@@ -11,7 +11,7 @@ from logger import Client
 #  schedule.every().hour.do(job)
 
 # Set up logger
-log_client = Client('Python scheduler', 'info')
+log_client = logger('Python scheduler', 'info')
 
 
 # Define jobs
@@ -24,6 +24,7 @@ def reset_rain_meter():
 schedule.every().day.at("00:00").do(reset_rain_meter)
 
 # Run scheduler
+log_client.info('Scheduler started')
 while True:
     schedule.run_pending()
     time.sleep(1)
