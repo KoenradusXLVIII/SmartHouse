@@ -204,7 +204,6 @@ void loop() {
               client.print(humi);
               client.print(F(", \"Rain\":"));
               client.print(rain_meter);  
-              rain_meter = 0; // Rain meter read, so reset
               client.print(F(", \"Soil Humidity\":"));
               client.print(soil_humi);              
               client.print(F(", \"Door state\":"));
@@ -229,8 +228,7 @@ void loop() {
             } else if (command == "rain") {
               client.print(F("{\"Rain\":"));
               client.print(rain_meter);
-              client.println(F("}"));
-              rain_meter = 0; // Rain meter read, so reset       
+              client.println(F("}"));    
             } else if (command == "soil_humi") {
               client.print(F("{\"Soil Humidity\":"));
               client.print(soil_humi);
@@ -303,7 +301,19 @@ void loop() {
               // Invalid SET parameter received
               client.println(F("Invalid parameter"));
               client.println();
-            }
+            } else if (command == "rain") {
+              if(cmd_value.toInt()) {
+                rain_meter = cmd_value.toInt();
+              } else {
+                // Invalid SET parameter received
+                client.println(F("Invalid parameter"));
+                client.println();
+              }
+
+              // Inform client
+              client.print(F("{\"Rain\":"));
+              client.print(rain_meter);
+              client.println(F("}"));
           }
           break;
         }
