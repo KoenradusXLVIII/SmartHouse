@@ -1,7 +1,7 @@
 import schedule
 import time
 import requests
-import logger
+from logger import Logger
 
 # Scheduler reference examples
 #  schedule.every(5).to(10).days.do(job)
@@ -11,7 +11,7 @@ import logger
 #  schedule.every().hour.do(job)
 
 # Set up logger
-log_client = logger('Python scheduler', 'info')
+log_client = Logger('Python scheduler', 'info')
 
 
 # Define jobs
