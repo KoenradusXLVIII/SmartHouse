@@ -13,3 +13,4 @@ arduino/NTPWifi/config.h
 *.json
 *.csv
 python/pushover/test_pushover.py
+python/logger/test.py
