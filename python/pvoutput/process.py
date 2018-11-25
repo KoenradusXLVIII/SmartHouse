@@ -11,7 +11,7 @@ from diff import diff
 from logger import Logger
 
 # Set up logger
-log_client = Logger('PVOutput', 'warning')
+log_client = Logger('pvoutput', 'warning')
 
 # Load configuration YAML
 fp = open('config.yaml', 'r')
@@ -107,16 +107,16 @@ def main():
     # Logging data
     log_client.debug('Date: %s' % date_str)
     log_client.debug('Time: %s' % time_str)
-    log_client.info('Power Generation: %s W' % P_PV)
-    log_client.info('Power Consumption: %s W' % P_cons)
+    log_client.debug('Power Generation: %s W' % P_PV)
+    log_client.debug('Power Consumption: %s W' % P_cons)
     log_client.debug('Energy Generation: %s Wh' % E_PV)
     log_client.debug('Energy Net Import: %s Wh' % E_net)
     log_client.debug('Energy Consumption: %s Wh' % E_cons)
-    log_client.info('Water Consumption: %s liter' % H2O)
-    log_client.info('Temperature: %s C' % temp)
-    log_client.info('Humidity: %s %%' % humi)
-    log_client.info('Rain: %s ml' % rain)
-    log_client.info('Soil Humidity: %s %%' % soil_humi)
+    log_client.debug('Water Consumption: %s liter' % H2O)
+    log_client.debug('Temperature: %s C' % temp)
+    log_client.debug('Humidity: %s %%' % humi)
+    log_client.debug('Rain: %s ml' % rain)
+    log_client.debug('Soil Humidity: %s %%' % soil_humi)
 
     # Prepare API data
     pvoutput_energy = cfg['pvoutput']['url'] +\
@@ -128,7 +128,7 @@ def main():
     # Upload
     if not local:
         r = requests.post(pvoutput_energy, headers=headers)
-        log_client.debug('Energy data upload: %s' % r.content)
+        log_client.info('Energy data upload: %s' % r.content)
 
     log_client.debug('=== END OF SESSION ===')
 

@@ -17,10 +17,10 @@ fp = open('config.yaml','r')
 cfg = yaml.load(fp)
 
 # Set up Pushover
-pushover = Pushover(cfg['pushover']['token'], cfg['pushover']['user'], cfg['pushover']['url'])
+pushover = Pushover(cfg['pushover']['token'], cfg['pushover']['user'])
 
 # Set up logger
-log_client = Logger('Foscam', 'info')
+log_client = Logger('foscam', 'info')
 
 def main():
     # Initialize variables

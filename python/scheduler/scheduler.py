@@ -11,7 +11,7 @@ from logger import Logger
 #  schedule.every().hour.do(job)
 
 # Set up logger
-log_client = Logger('Python scheduler', 'info')
+log_client = Logger('scheduler', 'info')
 
 
 # Define jobs
