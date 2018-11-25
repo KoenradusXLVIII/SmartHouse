@@ -8,10 +8,10 @@ import sys
 import yaml
 from P1 import read_telegram
 from diff import diff
-from logger import Logger
+import logger
 
 # Set up logger
-log_client = Logger('pvoutput', 'warning')
+log_client = logger.Client('pvoutput', 'warning')
 
 # Load configuration YAML
 fp = open('config.yaml', 'r')

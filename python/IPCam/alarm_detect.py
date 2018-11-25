@@ -4,8 +4,8 @@ import yaml
 import time
 import platform
 import logging.handlers
-from pushover import Pushover
-from logger import Logger
+import pushover
+import logger
 from xml.etree import ElementTree as ET
 from io import BytesIO
 
@@ -17,10 +17,10 @@ fp = open('config.yaml','r')
 cfg = yaml.load(fp)
 
 # Set up Pushover
-pushover = Pushover(cfg['pushover']['token'], cfg['pushover']['user'])
+pushover_client = pushover.Client(cfg['pushover']['token'], cfg['pushover']['user'])
 
 # Set up logger
-log_client = Logger('foscam', 'info')
+log_client = logger.Client('foscam', 'info')
 
 def main():
     # Initialize variables
@@ -38,9 +38,9 @@ def main():
                 log_client.warning('Alarm triggered!')
                 snap = snapshot()
                 if snap:
-                    pushover.message('Alarm triggered!', snapshot(), 'GuardHouse Security', 'high', 'alien')
+                    pushover_client.message('Alarm triggered!', snapshot(), 'GuardHouse Security', 'high', 'alien')
                 else:
-                    pushover.message('Alarm triggered, but unable to capture snapshot', '', 'GuardHouse Security', 'high', 'alien')
+                    pushover_client.message('Alarm triggered, but unable to capture snapshot', '', 'GuardHouse Security', 'high', 'alien')
             lastMotionState = motionDetectAlarm
 
     log_client.error('Foscam and Pushover monitoring scripts de-activated.')
