@@ -1,4 +1,3 @@
-import logging.handlers
 import requests
 import datetime
 import serial
