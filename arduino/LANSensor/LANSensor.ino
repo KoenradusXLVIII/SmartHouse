@@ -33,6 +33,8 @@
 #define HUMI 1
 #define LIGHT 0
 #define DARK 1
+#define DAY 0
+#define NIGTH 1
 
 // Enter a MAC address and IP address for your controller below.
 // The IP address will be dependent on your local network:
@@ -69,8 +71,11 @@ dht DHT;
   int water_hard_override_state = AUTO; // Default to AUTO mode  
   int water_soft_override_state = AUTO; // Default to AUTO mode
 
+  // Day/Night state
+  int day_night_state = DAY;            // Default to DAY mode
+
   // Light sensor
-  int light_delay = 30000;          // 30000ms = 30s default
+  int light_delay = 30000;              // 30000ms = 30s default
 
   // Rain sensor
   int prev_rain_state = HIGH;
@@ -212,6 +217,8 @@ void loop() {
               client.print(light_state);
               client.print(F(", \"Light delay\":"));
               client.print(light_delay);
+              client.print(F(", \"Day Night state\":"));
+              client.print(day_night_state);              
               client.println(F("}"));
             } else if (command == "door_state") {
               client.print(F("{\"Door state\":"));
@@ -241,6 +248,10 @@ void loop() {
               client.print(F("{\"Light state\":"));
               client.print(light_state);
               client.println(F("}"));
+            } else if (command == "day_night_state") {
+              client.print(F("{\"Day Night state\":"));
+              client.print(day_night_state);
+              client.println(F("}"));              
             } else {
               // Unknown variable
               client.println(F("Unkown variable"));
@@ -262,11 +273,11 @@ void loop() {
                 client.println(F("Invalid parameter"));
                 client.println();
               }
-
               // Inform client
               client.print(F("{\"Light delay\":"));
               client.print(light_delay);
               client.println(F("}"));
+              
             } else if (command == "light_mode") {
               if(cmd_value == "auto") {
                 light_soft_override_state = AUTO;
@@ -276,12 +287,12 @@ void loop() {
                 // Invalid SET parameter received
                 client.println(F("Invalid parameter"));
                 client.println();
-              }
-              
+              }  
               // Inform client
               client.print(F("{\"Light mode\":"));
               client.print(light_soft_override_state);
               client.println(F("}"));
+              
             } else if (command == "water_mode") {
               if(cmd_value == "auto") {
                 water_soft_override_state = AUTO;
@@ -291,16 +302,12 @@ void loop() {
                 // Invalid SET parameter received
                 client.println(F("Invalid parameter"));
                 client.println();
-              }
-              
+              }              
               // Inform client
               client.print(F("{\"Water mode\":"));
               client.print(water_soft_override_state);
               client.println(F("}"));
-            } else {
-              // Invalid SET parameter received
-              client.println(F("Invalid parameter"));
-              client.println();
+
             } else if (command == "rain") {
               if(cmd_value.toInt()) {
                 rain_meter = cmd_value.toInt();
@@ -309,11 +316,29 @@ void loop() {
                 client.println(F("Invalid parameter"));
                 client.println();
               }
-
               // Inform client
               client.print(F("{\"Rain\":"));
               client.print(rain_meter);
-              client.println(F("}"));
+              client.println(F("}"));         
+
+            } else if (command == "day_night_state") {
+              if(cmd_value.toInt()) {
+                day_night_state = cmd_value.toInt();
+              } else {
+                // Invalid SET parameter received
+                client.println(F("Invalid parameter"));
+                client.println();
+              }
+              // Inform client
+              client.print(F("{\"Day Nigth state\":"));
+              client.print(day_night_state);
+              client.println(F("}"));                        
+              
+            } else {
+              // Invalid SET parameter received
+              client.println(F("Invalid parameter"));
+              client.println();
+            } 
           }
           break;
         }
