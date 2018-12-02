@@ -15,7 +15,7 @@ cfg = yaml.load(fp)
 pushover_client = pushover.Client(cfg['pushover']['token'], cfg['pushover']['user'])
 
 # Set up logger client
-log_client = logger.Client('foscam', 'info')
+log_client = logger.Client('foscam', log_level='info', pushover_client=pushover_client)
 
 # Set up Guard House Arduino client
 arduino_client = arduino.Client(cfg['guardhouse']['url'])
@@ -46,7 +46,7 @@ def main():
         if motion_detect:
             # Alarm handling
             if (last_motion_state == cfg['foscam']['state']['no alarm']) and (motion_detect == cfg['foscam']['state']['alarm']):
-                log_client.warning('Alarm triggered!')
+                #log_client.warning('Alarm triggered!')
                 pushover_client.message('Alarm triggered!', snapshot(), 'GuardHouse Security', 'high', 'alien')
             last_motion_state = motion_detect
 
