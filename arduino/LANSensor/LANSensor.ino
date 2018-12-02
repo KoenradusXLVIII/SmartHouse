@@ -72,7 +72,6 @@ Json json;
   // Digital I/O variables
   int prev_door_state = CLOSED;         // Default to closed
   int light_soft_override_state = AUTO; // Default to AUTO mode 
-  int water_hard_override_state = AUTO; // Default to AUTO mode  
   int water_soft_override_state = AUTO; // Default to AUTO mode
 
   // Timers
@@ -101,6 +100,8 @@ void setup() {
 
   // Initialize output pin values
   digitalWrite(RAIN_OUT_PIN, LOW);  
+  digitalWrite(LIGHT_RELAY_PIN, LOW);  
+  digitalWrite(WATER_VALVE_PIN, LOW);  
 
   // start the Ethernet connection and the server:
   Ethernet.begin(mac, ip);
