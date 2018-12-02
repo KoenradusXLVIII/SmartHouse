@@ -20,7 +20,7 @@
 // Configuration
 #define BUFFER 64
 #define RAIN_CALIBRATION 3 // ml/pulse
-#define VAR_COUNT 7
+#define VAR_COUNT 8
 
 // Aliases
 #define CLOSED 0
@@ -61,23 +61,24 @@ dht DHT;
 // JSON library
 Json json;
 
-// Public variable array
-String var_array[VAR_COUNT] = {"temp", "humi", "rain", "soil_humi", "door_state", "light_state", "light_delay"};
-float value_array[VAR_COUNT] = {0, 0, 0, 0, CLOSED, OFF, 30000};
-
 // Define variables
+  String var_array[VAR_COUNT] = {"temp", "humi", "rain", "soil_humi", "door_state", "light_state", "light_delay", "water_valve_state"};
+  float value_array[VAR_COUNT] = {0, 0, 0, 0, CLOSED, OFF, 30000, CLOSED};
+
+  // DHT21 value buffer
   float buf_temp[BUFFER];
   float buf_humi[BUFFER];
   
   // Digital I/O variables
   int prev_door_state = CLOSED;         // Default to closed
   int light_soft_override_state = AUTO; // Default to AUTO mode 
-  unsigned long close_time;
-  bool timer_on = false;                // Default timer off
-  int water_valve_state = OFF;          // Default to water off
   int water_hard_override_state = AUTO; // Default to AUTO mode  
   int water_soft_override_state = AUTO; // Default to AUTO mode
 
+  // Timers
+  bool timer_on = false;                // Default timer off
+  unsigned long close_time;
+  
   // Rain sensor
   int prev_rain_state = HIGH;
 
@@ -220,12 +221,12 @@ void water_control(void)
   int water_hard_override_state = digitalRead(WATER_OVERRIDE_PIN);
   if ((water_hard_override_state == MANUAL) or (water_soft_override_state == MANUAL)) {
     // Manual override on water, set valve to OPEN
-    water_valve_state = OPEN;
+    value_array[get_id_from_name("water_valve_state")] = OPEN;
   } else {
     // Automatic mode, set valve to CLOSED
-    water_valve_state = CLOSED;
+    value_array[get_id_from_name("water_valve_state")] = CLOSED;
   }
-  digitalWrite(WATER_VALVE_PIN, water_valve_state);
+  digitalWrite(WATER_VALVE_PIN, value_array[get_id_from_name("water_valve_state")]);
 }
 
 void light_control(void)
