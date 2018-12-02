@@ -5,6 +5,8 @@ import time
 import pushover
 import logger
 import arduino
+import signal
+import sys
 from xml.etree import ElementTree as ET
 
 # Load configuration YAML
@@ -68,8 +70,6 @@ def main():
                 if not arduino_client.set_value('overhang_light_state', 0):
                     log_client.warning('Failed to write \'overhang_light_state\' to the Guard House API')
 
-    log_client.error('Foscam and Pushover monitoring scripts de-activated.')
-
 
 def devstate():
     # Read device status
@@ -98,5 +98,13 @@ def snapshot():
         return None
 
 
+def exit_gracefully(sig, frame):
+    log_client.info('Foscam and Pushover monitoring scripts de-activated.')
+    sys.exit()
+
+
+# Attach signals to catch SIGINT (CTRL-c) and SIGTERM (kill)
+signal.signal(signal.SIGINT, exit_gracefully)
+signal.signal(signal.SIGTERM, exit_gracefully)
 if __name__ == "__main__":
     main()
