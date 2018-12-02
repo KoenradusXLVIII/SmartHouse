@@ -69,6 +69,6 @@ void Json::set_var_value(int set_var_value)
 
 String Json::get_response(void)
 {
-  String response = "{\"" + var_name + "\":" + var_value + "}";
+  String response = "{" + var_name + ":" + var_value + "}";
   return response;
 }

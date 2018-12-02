@@ -21,54 +21,25 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+#ifndef Json_h
+#define Json_h
 
 #include "Arduino.h"
-#include "json.h"
 
-Json::Json()
+class Json
 {
-  // Constructor is empty
-}
+  public:
+    Json(); // Constructor
+    void parse_command(String command);
+    char get_cmd_type(void);
+    String get_var_name(void);
+    int get_var_value(void);
+    void set_var_value(int);
+    String get_response(void);
+  private:
+    char cmd_type;
+    String var_name;
+    int var_value;
+};
 
-void Json::parse_command(String command)
-{
-  // Intialise variables
-  cmd_type = 'G';     // Default to GET command
-  var_name = command;
-
-  for (int i = 0; i < command.length(); i++ ){
-    if (command.charAt(i) == '/') { // Command contains '/', so this is a SET command
-      cmd_type = 'S';
-      var_name = command.substring(0,i);
-      var_value = command.substring(i+1,command.length()).toInt();
-      break;
-    } 
-  }
-}
-
-char Json::get_cmd_type(void)
-{
-  return cmd_type;
-}
-
-String Json::get_var_name(void)
-{
-  return var_name;
-}
-
-int Json::get_var_value(void)
-{
-  return var_value;
-}
-
-void Json::set_var_value(int set_var_value)
-{
-  var_value = set_var_value;
-}
-
-
-String Json::get_response(void)
-{
-  String response = "{\"" + var_name + "\":" + var_value + "}";
-  return response;
-}
+#endif
