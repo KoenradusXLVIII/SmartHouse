@@ -56,12 +56,12 @@ String Json::get_var_name(void)
   return var_name;
 }
 
-int Json::get_var_value(void)
+float Json::get_var_value(void)
 {
   return var_value;
 }
 
-void Json::set_var_value(int set_var_value)
+void Json::set_var_value(float set_var_value)
 {
   var_value = set_var_value;
 }
@@ -69,6 +69,6 @@ void Json::set_var_value(int set_var_value)
 
 String Json::get_response(void)
 {
-  String response = "{" + var_name + ":" + var_value + "}";
+  String response = "{\"" + var_name + "\":" + var_value + "}";
   return response;
 }

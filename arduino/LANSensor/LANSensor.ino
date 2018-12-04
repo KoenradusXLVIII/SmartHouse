@@ -1,3 +1,5 @@
+// NEED TO GET ALL THE STRINGS OUT CAUSE MEMORY HANDLING SUCKS...
+
 #include <SPI.h>
 #include <Ethernet.h>
 #include <dht.h>
@@ -20,7 +22,9 @@
 // Configuration
 #define BUFFER 64
 #define RAIN_CALIBRATION 3 // ml/pulse
-#define VAR_COUNT 8
+
+// Defines
+#define VAR_COUNT 11
 
 // Aliases
 #define CLOSED 0
@@ -62,8 +66,8 @@ dht DHT;
 Json json;
 
 // Define variables
-  String var_array[VAR_COUNT] = {"temp", "humi", "rain", "soil_humi", "door_state", "light_state", "light_delay", "water_valve_state"};
-  float value_array[VAR_COUNT] = {0, 0, 0, 0, CLOSED, OFF, 30000, CLOSED};
+  String var_array[VAR_COUNT] = {"temp", "humi", "rain", "soil_humi", "door_state", "light_state", "light_delay", "water_valve_state", "alarm_mode", "light_mode", "water_mode"};
+  float value_array[VAR_COUNT] = {0, 0, 0, 0, CLOSED, OFF, 30000, CLOSED, ON, AUTO, AUTO};
 
   // DHT21 value buffer
   float buf_temp[BUFFER];
@@ -71,8 +75,6 @@ Json json;
   
   // Digital I/O variables
   int prev_door_state = CLOSED;         // Default to closed
-  int light_soft_override_state = AUTO; // Default to AUTO mode 
-  int water_soft_override_state = AUTO; // Default to AUTO mode
 
   // Timers
   bool timer_on = false;                // Default timer off
@@ -146,14 +148,11 @@ void loop() {
   if (client) {
     String readline;
     String command;
-
-    //Serial.print("Handling new incoming request... ");
-    // an http request ends with a blank line
     boolean currentLineIsBlank = true;
+    
     while (client.connected()) {
       if (client.available()) {
         char c = client.read();
-        //Serial.write(c);
 
         // Store the HTTP request line
         if (readline.length() < 100) {
@@ -179,7 +178,6 @@ void loop() {
 
         // EOL character received
         if (c == '\n') {
-          //Serial.println(readline);
           if (readline.startsWith("GET")) {
             // GET command received, stripping...
             command = readline;
@@ -200,7 +198,11 @@ void loop() {
     delay(1);
     // close the connection:
     client.stop();
-    Serial.println(F("[DONE]"));
+  }
+
+  // Process serial clients
+  {
+    // TODO
   }
 }
 
@@ -220,7 +222,7 @@ void rain_sensor(void)
 void water_control(void)
 {
   int water_hard_override_state = digitalRead(WATER_OVERRIDE_PIN);
-  if ((water_hard_override_state == MANUAL) or (water_soft_override_state == MANUAL)) {
+  if ((water_hard_override_state == MANUAL) or (value_array[get_id_from_name("water_mode")] == MANUAL)) {
     // Manual override on water, set valve to OPEN
     value_array[get_id_from_name("water_valve_state")] = OPEN;
   } else {
@@ -253,7 +255,7 @@ void light_control(void)
     int light_hard_override_state = digitalRead(LIGHT_OVERRIDE_PIN);
     if (value_array[get_id_from_name("light_state")] == ON)
       light_sensor = DARK;
-    if ((light_hard_override_state == AUTO) and (light_soft_override_state == AUTO) and (light_sensor == DARK)) {
+    if ((light_hard_override_state == AUTO) and (value_array[get_id_from_name("light_mode")] == AUTO) and (light_sensor == DARK)) {
       // ... if no overrides present.
       value_array[get_id_from_name("light_state")] = ON;
     } else {
@@ -316,7 +318,7 @@ float read_filtered_DHT(float *buf_data, int sensor) {
 
 String parse_command(String command)
 {
-  int var_value;
+  float var_value;
 
   json.parse_command(command);
 
@@ -356,12 +358,12 @@ int get_id_from_name(String var_name){
 String return_all() {
   String response = F("{\"");
   for (int i = 0; i < VAR_COUNT; i++ ){
-    response += var_array[i];
-    response += F("\":");
-    response += value_array[i];
+    response.concat(var_array[i]);
+    response.concat(F("\":"));
+    response.concat(value_array[i]);
     if (i < (VAR_COUNT - 1))
-      response += ", \""; 
+      response.concat(", \""); 
   }
-  response += F("}");
+  response.concat(F("}"));
   return response;
 }

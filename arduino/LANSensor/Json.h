@@ -33,13 +33,13 @@ class Json
     void parse_command(String command);
     char get_cmd_type(void);
     String get_var_name(void);
-    int get_var_value(void);
-    void set_var_value(int);
+    float get_var_value(void);
+    void set_var_value(float);
     String get_response(void);
   private:
     char cmd_type;
     String var_name;
-    int var_value;
+    float var_value;
 };
 
 #endif

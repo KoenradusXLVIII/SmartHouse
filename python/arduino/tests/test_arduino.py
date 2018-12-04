@@ -15,3 +15,11 @@ def arduino_client():
 def test_change_name(arduino_client, url):
     arduino_client.set_url(url)
     assert arduino_client.get_url() == url
+
+
+def test_code():
+    arduino_client = arduino.Client('http://192.168.1.112/')
+    if arduino_client.get_value('rain') is None:
+        print('Failed to write to Guard House API')
+    else:
+        print(arduino_client.get_value('rain'))

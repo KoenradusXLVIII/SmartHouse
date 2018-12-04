@@ -16,6 +16,11 @@ class Client:
         r = requests.get(url).json()
         return r[var.lower()]
 
+    def get_all(self):
+        url = self.url + 'all'
+        r = requests.get(url).json()
+        return r
+
     def set_value(self, var, value):
         url = self.url + var.lower() + '/' + str(value)
         r = requests.get(url).json()
