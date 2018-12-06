@@ -26,20 +26,25 @@ SOFTWARE.
 
 #include "Arduino.h"
 
+#define VAR_NAME_MAX_LENGTH 12 // 11 characters and '\0'
+#define VAR_VALUE_MAX_LENGTH 8 // max 9.999.999 (7 digits and '\0')
+
 class Json
 {
   public:
     Json(); // Constructor
-    void parse_command(String command);
+    void parse_command(char * charCommand);
     char get_cmd_type(void);
-    String get_var_name(void);
+    char * get_var_name(void);
     float get_var_value(void);
-    void set_var_value(float);
-    String get_response(void);
+    void set_var_value(float floatSetValue);
+    char * get_response(void);
   private:
-    char cmd_type;
-    String var_name;
-    float var_value;
+    char charCmdType;
+    char charName[VAR_NAME_MAX_LENGTH];
+    float floatValue;
+    char charValue[VAR_VALUE_MAX_LENGTH];
+    char charResponse[VAR_NAME_MAX_LENGTH+VAR_VALUE_MAX_LENGTH+1];
 };
 
 #endif

@@ -1,5 +1,3 @@
-// NEED TO GET ALL THE STRINGS OUT CAUSE MEMORY HANDLING SUCKS...
-
 #include <SPI.h>
 #include <Ethernet.h>
 #include <dht.h>
@@ -11,7 +9,7 @@
 #define DOOR_CONTACT_PIN 3
 #define LIGHT_RELAY_PIN 4
 #define LIGHT_OVERRIDE_PIN 5
-#define WATER_VALVE_PIN 6
+#define VALVE_PIN 6
 #define WATER_OVERRIDE_PIN 7
 #define RAIN_IN_PIN 8
 #define RAIN_OUT_PIN 9
@@ -25,6 +23,7 @@
 
 // Defines
 #define VAR_COUNT 11
+#define MAX_LINE_LENGTH 100
 
 // Aliases
 #define CLOSED 0
@@ -33,12 +32,23 @@
 #define AUTO 1
 #define OFF 0
 #define ON 1
-#define TEMP 0
-#define HUMI 1
 #define LIGHT 0
 #define DARK 1
 #define DAY 0
 #define NIGHT 1
+
+// Variable order
+#define TEMP 0
+#define HUMI 1
+#define RAIN 2
+#define SOIL_HUMI 3
+#define DOOR_STATE 4
+#define LIGHT_STATE 5
+#define LIGHT_DELAY 6
+#define VALVE_STATE 7
+#define ALARM_MODE 8
+#define LIGHT_MODE 9
+#define WATER_MODE 10
 
 // Enter a MAC address and IP address for your controller below.
 // The IP address will be dependent on your local network:
@@ -51,6 +61,8 @@ IPAddress ip(192, 168, 1, 112);
 // with the IP address and port you want to use
 // (port 80 is default for HTTP):
 EthernetServer server(80);
+// '{"VAR_NAME":VAR_VALUE,"VAR_NAME":VAR_VALUE,...,"VAR_NAME":VAR_VALUE}\0'
+char charResponse[1+VAR_COUNT*(1+VAR_NAME_MAX_LENGTH+1+1+VAR_VALUE_MAX_LENGTH+1)-1+1+1];
  
 // Initialize SHT10
 // VCC - Brown - Red
@@ -66,7 +78,10 @@ dht DHT;
 Json json;
 
 // Define variables
-  String var_array[VAR_COUNT] = {"temp", "humi", "rain", "soil_humi", "door_state", "light_state", "light_delay", "water_valve_state", "alarm_mode", "light_mode", "water_mode"};
+  char var_array[VAR_COUNT][VAR_NAME_MAX_LENGTH] =
+   {"temp", "humi", "rain", "soil_humi", "door_state", 
+    "light_state", "light_delay", "valve_state", 
+    "alarm_mode", "light_mode", "water_mode"};
   float value_array[VAR_COUNT] = {0, 0, 0, 0, CLOSED, OFF, 30000, CLOSED, ON, AUTO, AUTO};
 
   // DHT21 value buffer
@@ -94,7 +109,7 @@ void setup() {
   pinMode(DOOR_CONTACT_PIN,INPUT);
   pinMode(LIGHT_RELAY_PIN,OUTPUT);
   pinMode(LIGHT_OVERRIDE_PIN,INPUT_PULLUP);
-  pinMode(WATER_VALVE_PIN,OUTPUT);
+  pinMode(VALVE_PIN,OUTPUT);
   pinMode(WATER_OVERRIDE_PIN,INPUT_PULLUP);
   pinMode(RAIN_OUT_PIN, OUTPUT);
   pinMode(RAIN_IN_PIN, INPUT_PULLUP);
@@ -103,7 +118,7 @@ void setup() {
   // Initialize output pin values
   digitalWrite(RAIN_OUT_PIN, LOW);  
   digitalWrite(LIGHT_RELAY_PIN, LOW);  
-  digitalWrite(WATER_VALVE_PIN, LOW);  
+  digitalWrite(VALVE_PIN, LOW);  
 
   // start the Ethernet connection and the server:
   Ethernet.begin(mac, ip);
@@ -125,11 +140,11 @@ void setup() {
 
 void loop() {
   // Get new filtered DHT21 values
-  value_array[get_id_from_name("temp")] = read_filtered_DHT(buf_temp,TEMP);
-  value_array[get_id_from_name("humi")] = read_filtered_DHT(buf_humi,HUMI);
+  value_array[TEMP] = read_filtered_DHT(buf_temp,TEMP);
+  value_array[HUMI] = read_filtered_DHT(buf_humi,HUMI);
 
   // Door state
-  value_array[get_id_from_name("door_state")] = digitalRead(DOOR_CONTACT_PIN);
+  value_array[DOOR_STATE] = digitalRead(DOOR_CONTACT_PIN);
 
   // Light
   light_control();
@@ -141,56 +156,67 @@ void loop() {
   rain_sensor();
 
   // Soil moisture sensor
-  value_array[get_id_from_name("soil_humi")] = sht10.readHumidity();
+  value_array[3] = sht10.readHumidity();
   
   // Processe ethernet clients
   EthernetClient client = server.available();
   if (client) {
-    String readline;
-    String command;
+    char charReadLine[MAX_LINE_LENGTH];
+    char charCommand[VAR_NAME_MAX_LENGTH+VAR_VALUE_MAX_LENGTH+1];
     boolean currentLineIsBlank = true;
+    int i = 0;
+    char c;
     
     while (client.connected()) {
       if (client.available()) {
-        char c = client.read();
-
         // Store the HTTP request line
-        if (readline.length() < 100) {
-          readline += c;
+        c = client.read();
+        if (i < MAX_LINE_LENGTH) {
+          charReadLine[i] = c;
+          charReadLine[i+1] = '\0';
         }
-
+        i++;
+                
         // if you've gotten to the end of the line (received a newline
         // character) and the line is blank, the http request has ended,
         // so you can send a reply
         if (c == '\n' && currentLineIsBlank) {
           // Parse command
-          String response;
-          response = parse_command(command);
-
+          Serial.print("Parse command: ");
+          Serial.println(charCommand);
+          parse_command(charCommand);
+          
           // Initialise JSON response
           client.println(F("HTTP/1.1 200 OK"));
           client.println(F("Content-Type: text/json"));
           client.println(F("Connection: close"));
           client.println();
-          client.println(response);
+          client.println(charResponse);
           break;
         }
 
-        // EOL character received
         if (c == '\n') {
-          if (readline.startsWith("GET")) {
-            // GET command received, stripping...
-            command = readline;
-            command.remove(0, 5);  // Strip "GET /"
-            command.remove(command.length()-11);      // Strip " HTTP/1.1"
+          Serial.print(charReadLine);
+          // EOL character received
+          if ((charReadLine[0] == 'G') && (charReadLine[1] == 'E') && (charReadLine[2] == 'T')) {
+            // GET command received, stripping... 
+            // From the front: "GET /" - 5 characters
+            // From the back: " HTTP/1.1" - 9 charachters
+            strncpy(charCommand,&charReadLine[5],strlen(charReadLine)-16);
+            charCommand[strlen(charReadLine)-16] = '\0';
+            Serial.print("Got command: ");
+            Serial.print(charCommand);
+            Serial.print(" [");
+            Serial.print(strlen(charCommand));
+            Serial.println("]");
           }
-          readline = "";
+          // Erase line and reset character pointer
+          charReadLine[0] = '\0';
+          i = 0;
           currentLineIsBlank = true;
-
-        // Carriage Return received
         } else if (c != '\r') {
-          // you've gotten a character on the current line
           currentLineIsBlank = false;
+          // Character received on this line      
         }
       }
     }
@@ -212,7 +238,7 @@ void rain_sensor(void)
   int cur_rain_state = digitalRead(RAIN_IN_PIN);
   if ((cur_rain_state == LOW) and (prev_rain_state == HIGH)) {
     // Start of pulse detected
-    value_array[get_id_from_name("rain")] += RAIN_CALIBRATION;
+    value_array[RAIN] += RAIN_CALIBRATION;
   }
 
   // Store current rain state for future reference
@@ -222,14 +248,14 @@ void rain_sensor(void)
 void water_control(void)
 {
   int water_hard_override_state = digitalRead(WATER_OVERRIDE_PIN);
-  if ((water_hard_override_state == MANUAL) or (value_array[get_id_from_name("water_mode")] == MANUAL)) {
+  if ((water_hard_override_state == MANUAL) or (value_array[10] == MANUAL)) {
     // Manual override on water, set valve to OPEN
-    value_array[get_id_from_name("water_valve_state")] = OPEN;
+    value_array[VALVE_STATE] = OPEN;
   } else {
     // Automatic mode, set valve to CLOSED
-    value_array[get_id_from_name("water_valve_state")] = CLOSED;
+    value_array[VALVE_STATE] = CLOSED;
   }
-  digitalWrite(WATER_VALVE_PIN, value_array[get_id_from_name("water_valve_state")]);
+  digitalWrite(VALVE_PIN, value_array[VALVE_STATE]);
 }
 
 void light_control(void)
@@ -244,26 +270,26 @@ void light_control(void)
   } else if ((prev_door_state == CLOSED) and (cur_door_state == CLOSED)) {
     // Door was closed and is closed
     if(timer_on) {
-      if ((millis() - close_time) > (value_array[get_id_from_name("light_delay")])) {
+      if ((millis() - close_time) > (value_array[LIGHT_DELAY])) {
         // Timer has expired, turn light off
-        value_array[get_id_from_name("light_state")] = OFF;
+        value_array[LIGHT_STATE] = OFF;
         timer_on = false;
       }
     }
   } else { // cur_door_state == OPEN
     // Door is open, ...
     int light_hard_override_state = digitalRead(LIGHT_OVERRIDE_PIN);
-    if (value_array[get_id_from_name("light_state")] == ON)
+    if (value_array[LIGHT_STATE] == ON)
       light_sensor = DARK;
-    if ((light_hard_override_state == AUTO) and (value_array[get_id_from_name("light_mode")] == AUTO) and (light_sensor == DARK)) {
+    if ((light_hard_override_state == AUTO) and (value_array[LIGHT_MODE] == AUTO) and (light_sensor == DARK)) {
       // ... if no overrides present.
-      value_array[get_id_from_name("light_state")] = ON;
+      value_array[LIGHT_STATE] = ON;
     } else {
        // ... otherwise turn OFF
-      value_array[get_id_from_name("light_state")] = OFF;
+      value_array[LIGHT_STATE] = OFF;
     }
   }
-  digitalWrite(LIGHT_RELAY_PIN, value_array[get_id_from_name("light_state")]);    
+  digitalWrite(LIGHT_RELAY_PIN, value_array[LIGHT_STATE]);    
   prev_door_state = cur_door_state;
 }
 
@@ -316,54 +342,59 @@ float read_filtered_DHT(float *buf_data, int sensor) {
   return float(sum / len);
 }
 
-String parse_command(String command)
+void parse_command(char * command)
 {
   float var_value;
 
   json.parse_command(command);
 
-  if (json.get_var_name() == "all") {
+  if (strcmp(json.get_var_name(),"all")==0) {
     // All parameters requested
-    return return_all();
+    return_all();
   } else {
     // Single parameter requested
     // Verify if it is valid
     int id = get_id_from_name(json.get_var_name());
     if (id == -1) {
       // Invalid parameter received
-      return F("Invalid parameter");
+      strcpy(charResponse,"Invalid parameter");
     } else {
-      if (json.get_cmd_type() == 'G'){
+      if (json.get_cmd_type()== 'G'){
         // Retrieve value from array
         var_value = value_array[id];
         // Write to JSON parser
+        Serial.print("value: ");
+        Serial.println(var_value);
         json.set_var_value(var_value);
       } else { // cmd_type == 'S'
         // Write value to array
         value_array[id] = json.get_var_value();;
       }
-      return json.get_response();
+      strcpy(charResponse,json.get_response());
     }
   }
 }
 
-int get_id_from_name(String var_name){
+int get_id_from_name(char * var_name){
   for (int i = 0; i < VAR_COUNT; i++ ){
-    if(var_array[i] == var_name)
+    if(strcmp(var_array[i],var_name) == 0)
       return i;
   }
   return -1;
 }
 
-String return_all() {
-  String response = F("{\"");
+void return_all() {
+  // Initialize variables
+  char charValue[VAR_VALUE_MAX_LENGTH];
+  
+  strcpy(charResponse, "{\"");
   for (int i = 0; i < VAR_COUNT; i++ ){
-    response.concat(var_array[i]);
-    response.concat(F("\":"));
-    response.concat(value_array[i]);
+    strcat(charResponse, var_array[i]);
+    strcat(charResponse, "\":");
+    dtostrf(value_array[i], 3, 2, charValue);
+    strcat(charResponse, charValue);
     if (i < (VAR_COUNT - 1))
-      response.concat(", \""); 
+      strcat(charResponse, ",\""); 
   }
-  response.concat(F("}"));
-  return response;
+  strcat(charResponse,"}");
 }
