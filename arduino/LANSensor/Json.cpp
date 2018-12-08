@@ -33,15 +33,17 @@ Json::Json()
 void Json::parse_command(char * charCommand)
 {
   // Intialise variables
-  
+  int intValue;  
   charCmdType = 'G';     // Default to GET command
   strcpy(charName, charCommand);
 
   for (int i = 0; i < strlen(charCommand); i++ ){
     if (charCommand[i] == '/') { // Command contains '/', so this is a SET command
       charCmdType = 'S';
-      sscanf(charCommand,"%s/%d", charName, &floatValue);
-      sprintf(charValue, "%f", floatValue);
+      charCommand[i] = ' ';
+      sscanf(charCommand,"%s %d", charName, &intValue);
+      floatValue = (float)intValue;
+      dtostrf(floatValue, 3, 2, charValue);
       break;
     } 
   }

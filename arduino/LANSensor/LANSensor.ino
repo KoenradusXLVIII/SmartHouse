@@ -182,8 +182,6 @@ void loop() {
         // so you can send a reply
         if (c == '\n' && currentLineIsBlank) {
           // Parse command
-          Serial.print("Parse command: ");
-          Serial.println(charCommand);
           parse_command(charCommand);
           
           // Initialise JSON response
@@ -196,7 +194,6 @@ void loop() {
         }
 
         if (c == '\n') {
-          Serial.print(charReadLine);
           // EOL character received
           if ((charReadLine[0] == 'G') && (charReadLine[1] == 'E') && (charReadLine[2] == 'T')) {
             // GET command received, stripping... 
@@ -204,11 +201,6 @@ void loop() {
             // From the back: " HTTP/1.1" - 9 charachters
             strncpy(charCommand,&charReadLine[5],strlen(charReadLine)-16);
             charCommand[strlen(charReadLine)-16] = '\0';
-            Serial.print("Got command: ");
-            Serial.print(charCommand);
-            Serial.print(" [");
-            Serial.print(strlen(charCommand));
-            Serial.println("]");
           }
           // Erase line and reset character pointer
           charReadLine[0] = '\0';
@@ -363,8 +355,6 @@ void parse_command(char * command)
         // Retrieve value from array
         var_value = value_array[id];
         // Write to JSON parser
-        Serial.print("value: ");
-        Serial.println(var_value);
         json.set_var_value(var_value);
       } else { // cmd_type == 'S'
         // Write value to array

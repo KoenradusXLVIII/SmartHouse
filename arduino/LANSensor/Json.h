@@ -27,7 +27,7 @@ SOFTWARE.
 #include "Arduino.h"
 
 #define VAR_NAME_MAX_LENGTH 12 // 11 characters and '\0'
-#define VAR_VALUE_MAX_LENGTH 8 // max 9.999.999 (7 digits and '\0')
+#define VAR_VALUE_MAX_LENGTH 10 // max 999999.99 (7 digits, decimal point, 2 digits and '\0')
 
 class Json
 {
