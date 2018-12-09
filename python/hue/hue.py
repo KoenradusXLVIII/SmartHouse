@@ -1,33 +1,18 @@
-import schedule
-import requests
-import logger
-from phue import Bridge
 import yaml
 import time
 import random
-
-# Scheduler reference examples
-#  schedule.every(5).to(10).days.do(job)
-#  schedule.every().monday.do(job)
-#  schedule.every().wednesday.at("13:15").do(job)
-#  schedule.every(10).seconds.do(job)
-#  schedule.every().hour.do(job)
-
-# Set up logger
-log_client = logger.Client('scheduler', 'info')
+import logger
+from phue import Bridge
 
 # Load configuration YAML
 fp = open('config.yaml','r')
 cfg = yaml.load(fp)
 
-
-# Define jobs
-def reset_rain_meter():
-    r = requests.get('http://192.168.1.112/rain/0')
-    log_client.info('Rain meter reset to 0')
+# Set up logger client
+log_client = logger.Client('foscam', log_level='info')
 
 
-def lights_on():
+def main():
     # Connect to Hue Bridge
     b = Bridge(cfg['hue']['url'])
     # Get current light state
@@ -43,15 +28,8 @@ def lights_on():
     if all_off:
         b.activate_scene(hueGroups[0].group_id, get_scene_by_name('Away', hueScenes))
 
-
-def lights_out():
-    # Connect to Hue Bridge
-    b = Bridge(cfg['hue']['url'])
-    # Get current light state
-    hueLights = b.lights
-    hueGroups = b.groups
     # Check if 'away' scene active
-    if not get_active_scene('away', hueLights):
+    if get_active_scene('away', hueLights):
         # Turn all lights off within a set random time
         time.sleep(random.randint(1,cfg['hue']['random']))
         log_client.info('Lights out!')
@@ -82,14 +60,7 @@ def get_scene_by_name(name, scenes):
             return scene.scene_id
     return 0
 
+if __name__ == "__main__":
+    main()
 
-# Schedule jobs
-schedule.every().day.at("00:00").do(reset_rain_meter)
-schedule.every().day.at("22:30").do(lights_out)
-schedule.every().day.at("18:00").do(lights_on)
 
-# Run scheduler
-log_client.info('Scheduler started')
-while True:
-    schedule.run_pending()
-    time.sleep(1)

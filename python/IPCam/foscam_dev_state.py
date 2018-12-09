@@ -40,8 +40,8 @@ def main():
         # Check to see if infrared LEDs on (detect day/night transition)
         infra_led_state = foscam_dev_state.find('infraLedState').text
         if infra_led_state != last_infra_led_state:
-            if not arduino_client.set_value('infra_led_state',infra_led_state):
-                log_client.warning('Failed to write \'infra_led_state\' to Guard House API')
+            if not arduino_client.set_value('day_night',infra_led_state):
+                log_client.warning('Failed to write \'day_night\' to Guard House API')
 
         # Check for motion detection
         motion_detect = foscam_dev_state.find('motionDetectAlarm').text
@@ -53,22 +53,23 @@ def main():
             last_motion_state = motion_detect
 
             # Light handling
-            if (time.time() - light_timer) > cfg['overhang']['hysteresis']:
+            if (time.time() - light_timer) > cfg['motor']['hysteresis']:
                 # Last change to light setting was more then the hysteresis limit, so a change is allowed
-                if arduino_client.get_value('day_night_state'):
+                if arduino_client.get_value('day_night'):
                     # It is dark out so we should turn the light on
-                    if not arduino_client.get_value('overhang_light_state'):
+                    if not arduino_client.get_value('motor_light'):
                         # Turn light on if it is off
-                        arduino_client.set_value('overhang_light_state', 1)
+                        if not arduino_client.set_value('motor_light', 1):
+                            log_client.warning('Failed to write \'motor_light\' to the Guard House API')
                         # Set the hysteresis timer
                         light_timer = time.time()
         else:
             # Light handling
-            if (time.time() - light_timer) > cfg['overhang']['hysteresis']:
+            if (time.time() - light_timer) > cfg['motor']['hysteresis']:
                 # Last change to light setting was more then the hysteresis limit, so a change is allowed
                 # There is no motion detected so we turn the light off
-                if not arduino_client.set_value('overhang_light_state', 0):
-                    log_client.warning('Failed to write \'overhang_light_state\' to the Guard House API')
+                if not arduino_client.set_value('motor_light', 0):
+                    log_client.warning('Failed to write \'motor_light\' to the Guard House API')
 
 
 def devstate():

@@ -22,7 +22,7 @@
 #define RAIN_CALIBRATION 3 // ml/pulse
 
 // Defines
-#define VAR_COUNT 11
+#define VAR_COUNT 13
 #define MAX_LINE_LENGTH 100
 
 // Aliases
@@ -78,11 +78,13 @@ dht DHT;
 Json json;
 
 // Define variables
-  char var_array[VAR_COUNT][VAR_NAME_MAX_LENGTH] =
+  const char var_array[VAR_COUNT][VAR_NAME_MAX_LENGTH] PROGMEM =
    {"temp", "humi", "rain", "soil_humi", "door_state", 
     "light_state", "light_delay", "valve_state", 
-    "alarm_mode", "light_mode", "water_mode"};
-  float value_array[VAR_COUNT] = {0, 0, 0, 0, CLOSED, OFF, 30000, CLOSED, ON, AUTO, AUTO};
+    "alarm_mode", "light_mode", "water_mode",
+    "motor_light", "day_night"};
+  float value_array[VAR_COUNT] = {0, 0, 0, 0, CLOSED, OFF, 30000, CLOSED, ON, AUTO, AUTO, OFF, DAY};
+  const char charInvalid[] PROGMEM = "Invalid parameter";
 
   // DHT21 value buffer
   float buf_temp[BUFFER];
@@ -156,7 +158,7 @@ void loop() {
   rain_sensor();
 
   // Soil moisture sensor
-  value_array[3] = sht10.readHumidity();
+  value_array[SOIL_HUMI] = sht10.readHumidity();
   
   // Processe ethernet clients
   EthernetClient client = server.available();
@@ -240,7 +242,7 @@ void rain_sensor(void)
 void water_control(void)
 {
   int water_hard_override_state = digitalRead(WATER_OVERRIDE_PIN);
-  if ((water_hard_override_state == MANUAL) or (value_array[10] == MANUAL)) {
+  if ((water_hard_override_state == MANUAL) or (value_array[WATER_MODE] == MANUAL)) {
     // Manual override on water, set valve to OPEN
     value_array[VALVE_STATE] = OPEN;
   } else {
@@ -301,7 +303,7 @@ float read_filtered_DHT(float *buf_data, int sensor) {
       buf_data[0] = DHT.humidity;
       break;
     default:
-      Serial.println(F("[ERROR] Unknown sensor type"));
+      //Serial.println(F("[ERROR] Unknown sensor type"));
       return 0.0;
   }
 
@@ -349,7 +351,7 @@ void parse_command(char * command)
     int id = get_id_from_name(json.get_var_name());
     if (id == -1) {
       // Invalid parameter received
-      strcpy(charResponse,"Invalid parameter");
+      strcpy(charResponse,charInvalid);
     } else {
       if (json.get_cmd_type()== 'G'){
         // Retrieve value from array

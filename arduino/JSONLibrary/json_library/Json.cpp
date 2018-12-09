@@ -30,17 +30,20 @@ Json::Json()
   // Constructor is empty
 }
 
-void Json::parse_command(String command)
+void Json::parse_command(char * charCommand)
 {
   // Intialise variables
-  cmd_type = 'G';     // Default to GET command
-  var_name = command;
+  int intValue;  
+  charCmdType = 'G';     // Default to GET command
+  strcpy(charName, charCommand);
 
-  for (int i = 0; i < command.length(); i++ ){
-    if (command.charAt(i) == '/') { // Command contains '/', so this is a SET command
-      cmd_type = 'S';
-      var_name = command.substring(0,i);
-      var_value = command.substring(i+1,command.length()).toInt();
+  for (int i = 0; i < strlen(charCommand); i++ ){
+    if (charCommand[i] == '/') { // Command contains '/', so this is a SET command
+      charCmdType = 'S';
+      charCommand[i] = ' ';
+      sscanf(charCommand,"%s %d", charName, &intValue);
+      floatValue = (float)intValue;
+      dtostrf(floatValue, 3, 2, charValue);
       break;
     } 
   }
@@ -48,27 +51,31 @@ void Json::parse_command(String command)
 
 char Json::get_cmd_type(void)
 {
-  return cmd_type;
+  return charCmdType;
 }
 
-String Json::get_var_name(void)
+char * Json::get_var_name(void)
 {
-  return var_name;
+  return charName;
 }
 
-int Json::get_var_value(void)
+float Json::get_var_value(void)
 {
-  return var_value;
+  return floatValue;
 }
 
-void Json::set_var_value(int set_var_value)
+void Json::set_var_value(float floatSetValue)
 {
-  var_value = set_var_value;
+  floatValue = floatSetValue;
+  dtostrf(floatValue, 3, 2, charValue);
 }
 
-
-String Json::get_response(void)
-{
-  String response = "{\"" + var_name + "\":" + var_value + "}";
-  return response;
+char * Json::get_response(void)
+{ 
+  strcpy(charResponse, "{\"");
+  strcat(charResponse, charName);
+  strcat(charResponse, "\":");
+  strcat(charResponse, charValue);
+  strcat(charResponse, "}");
+  return charResponse;
 }
