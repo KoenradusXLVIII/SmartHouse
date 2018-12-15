@@ -1,6 +1,10 @@
 import schedule
 import time
-from jobs import reset_rain_meter, lights_on, lights_out
+import logger
+from jobs import reset_rain_meter, check_lights_on, lights_out
+
+# Set up logger
+log_client = logger.Client('scheduler', 'info')
 
 # Scheduler reference examples
 #  schedule.every(5).to(10).days.do(job)
@@ -10,9 +14,9 @@ from jobs import reset_rain_meter, lights_on, lights_out
 #  schedule.every().hour.do(job)
 
 # Schedule jobs
-schedule.every().day.at("00:00").do(reset_rain_meter)
-schedule.every().day.at("18:00").do(lights_on)
-schedule.every().day.at("22:30").do(lights_out)
+schedule.every().day.at("00:00").do(reset_rain_meter, log_client)
+schedule.every(15).minutes.do(check_lights_on, log_client)
+schedule.every().day.at("22:30").do(lights_out, log_client)
 
 # Run scheduler
 while True:

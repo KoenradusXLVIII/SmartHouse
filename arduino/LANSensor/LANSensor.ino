@@ -16,6 +16,7 @@
 #define SHT10_DATA_PIN 14
 #define SHT10_CLK_PIN 15
 #define LIGHT_SENSOR_PIN 16
+#define CHRISTMAS_PIN 17
 
 // Configuration
 #define BUFFER 64
@@ -49,6 +50,8 @@
 #define ALARM_MODE 8
 #define LIGHT_MODE 9
 #define WATER_MODE 10
+#define MOTOR_LIGHT 11
+#define DAY_NIGHT 12
 
 // Enter a MAC address and IP address for your controller below.
 // The IP address will be dependent on your local network:
@@ -78,7 +81,7 @@ dht DHT;
 Json json;
 
 // Define variables
-  const char var_array[VAR_COUNT][VAR_NAME_MAX_LENGTH] PROGMEM =
+  const char var_array[VAR_COUNT][VAR_NAME_MAX_LENGTH] =
    {"temp", "humi", "rain", "soil_humi", "door_state", 
     "light_state", "light_delay", "valve_state", 
     "alarm_mode", "light_mode", "water_mode",
@@ -92,6 +95,7 @@ Json json;
   
   // Digital I/O variables
   int prev_door_state = CLOSED;         // Default to closed
+  int prev_day_night_state = DAY;       // Default to day
 
   // Timers
   bool timer_on = false;                // Default timer off
@@ -116,11 +120,13 @@ void setup() {
   pinMode(RAIN_OUT_PIN, OUTPUT);
   pinMode(RAIN_IN_PIN, INPUT_PULLUP);
   pinMode(LIGHT_SENSOR_PIN, INPUT);
+  pinMode(CHRISTMAS_PIN, OUTPUT);
 
   // Initialize output pin values
   digitalWrite(RAIN_OUT_PIN, LOW);  
   digitalWrite(LIGHT_RELAY_PIN, LOW);  
-  digitalWrite(VALVE_PIN, LOW);  
+  digitalWrite(VALVE_PIN, LOW);
+  digitalWrite(CHRISTMAS_PIN, LOW);  
 
   // start the Ethernet connection and the server:
   Ethernet.begin(mac, ip);
@@ -157,6 +163,13 @@ void loop() {
   // Rain sensor
   rain_sensor();
 
+  // Christmas lights
+  if((value_array[DAY_NIGHT] == NIGHT) && (prev_day_night_state == DAY))
+    digitalWrite(CHRISTMAS_PIN, HIGH);
+  else if ((value_array[DAY_NIGHT] == DAY) && (prev_day_night_state == NIGHT))
+    digitalWrite(CHRISTMAS_PIN, LOW);    
+  prev_day_night_state = value_array[DAY_NIGHT];
+
   // Soil moisture sensor
   value_array[SOIL_HUMI] = sht10.readHumidity();
   
@@ -184,6 +197,7 @@ void loop() {
         // so you can send a reply
         if (c == '\n' && currentLineIsBlank) {
           // Parse command
+          //Serial.println(charCommand);
           parse_command(charCommand);
           
           // Initialise JSON response
@@ -349,12 +363,16 @@ void parse_command(char * command)
     // Single parameter requested
     // Verify if it is valid
     int id = get_id_from_name(json.get_var_name());
+    //Serial.print("GET: ");
+    //Serial.println(json.get_var_name());     
     if (id == -1) {
       // Invalid parameter received
       strcpy(charResponse,charInvalid);
     } else {
       if (json.get_cmd_type()== 'G'){
         // Retrieve value from array
+        //Serial.print("GET: ");
+        //Serial.println(id); 
         var_value = value_array[id];
         // Write to JSON parser
         json.set_var_value(var_value);

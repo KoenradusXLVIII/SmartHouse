@@ -38,14 +38,14 @@ def read_telegram(ser, logger, port):
             logger.error('Unable to read from serial port: %s' % port)
             sys.exit()
         itt += 1
-        logger.trace('Telegram line(s) read: %d' % itt)
+        logger.debug('Telegram line(s) read: %d' % itt)
         if (itt >= telegram_length):
             logger.error('Invalid telegram [serial number not found]')
             return -1
     # Start of transmission detected
     logger.debug('Start of transmission detected')
     data.append(data_raw.strip())
-    logger.trace('[P1]: %s' % data_raw.strip())
+    logger.debug('[P1]: %s' % data_raw.strip())
     CRC_data += data_raw
 
     # Read until end of telegram character detected
@@ -97,5 +97,5 @@ def read_telegram(ser, logger, port):
             return [int(power), int(energy)]
         else:
             # Message incorrect, CRC mismatch
-            logger.warning('CRC mismatch: 0x%s / 0x%s' % (CRC,CRC_rec))
+            logger.debug('CRC mismatch: 0x%s / 0x%s' % (CRC,CRC_rec))
             return [-1, -1]

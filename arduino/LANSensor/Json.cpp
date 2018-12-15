@@ -36,6 +36,7 @@ void Json::parse_command(char * charCommand)
   int intValue;  
   charCmdType = 'G';     // Default to GET command
   strcpy(charName, charCommand);
+  //Serial.println(charName);
 
   for (int i = 0; i < strlen(charCommand); i++ ){
     if (charCommand[i] == '/') { // Command contains '/', so this is a SET command

@@ -25,4 +25,4 @@ class Client:
         url = self.url + var.lower() + '/' + str(value)
         r = requests.get(url).json()
         if r[var.lower()] == int(value):
-            return value
+            return True

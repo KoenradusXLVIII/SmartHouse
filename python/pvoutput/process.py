@@ -5,15 +5,17 @@ import urllib
 import json
 import sys
 import yaml
+import os
 from P1 import read_telegram
 from diff import diff
 import logger
 
 # Set up logger
-log_client = logger.Client('pvoutput', 'warning')
+log_client = logger.Client(name='pvoutput')
 
 # Load configuration YAML
-fp = open('config.yaml', 'r')
+path = os.path.dirname(os.path.realpath(__file__))
+fp = open(path + '/config.yaml', 'r')
 cfg = yaml.load(fp)
 
 # Check command line parameters
@@ -82,10 +84,10 @@ def main():
         log_client.debug('Accessing Guard House web service at %s' % cfg['arduino_url']['mainhouse'])
         response = urllib.urlopen(cfg['arduino_url']['guardhouse'])
         data_json = json.loads(response.read())
-        temp = data_json['Temperature']
-        humi = data_json['Humidity']
-        rain = data_json['Rain']
-        soil_humi = data_json['Soil Humidity']
+        temp = data_json['temp']
+        humi = data_json['humi']
+        rain = data_json['rain']
+        soil_humi = data_json['soil_humi']
     except:
         log_client.error('No data received from GuardHouse')
         temp = 0

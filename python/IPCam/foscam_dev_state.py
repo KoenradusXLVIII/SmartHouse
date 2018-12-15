@@ -17,7 +17,7 @@ cfg = yaml.load(fp)
 pushover_client = pushover.Client(cfg['pushover']['token'], cfg['pushover']['user'])
 
 # Set up logger client
-log_client = logger.Client('foscam', log_level='info', pushover_client=pushover_client)
+log_client = logger.Client(name='foscam', log_level='info', pushover_client=pushover_client)
 
 # Set up Guard House Arduino client
 arduino_client = arduino.Client(cfg['guardhouse']['url'])
@@ -40,17 +40,24 @@ def main():
         # Check to see if infrared LEDs on (detect day/night transition)
         infra_led_state = foscam_dev_state.find('infraLedState').text
         if infra_led_state != last_infra_led_state:
-            if not arduino_client.set_value('day_night',infra_led_state):
-                log_client.warning('Failed to write \'day_night\' to Guard House API')
+            # Update Guard House API
+            if arduino_client.set_value('day_night', infra_led_state):
+                if infra_led_state:  # night
+                    log_client.info('Transition to night written to Guard House API')
+                else:  # day
+                    log_client.info('Transition to day written to Guard House API')
+            else:
+                log_client.warning('Failed to write \'infra_led_state\' to Guard House API')
 
         # Check for motion detection
         motion_detect = foscam_dev_state.find('motionDetectAlarm').text
         if motion_detect:
             # Alarm handling
-            if (last_motion_state == cfg['foscam']['state']['no alarm']) and (motion_detect == cfg['foscam']['state']['alarm']):
-                #log_client.warning('Alarm triggered!')
-                pushover_client.message('Alarm triggered!', snapshot(), 'GuardHouse Security', 'high', 'alien')
-            last_motion_state = motion_detect
+            if arduino_client.get_value('alarm_mode'):
+                if (last_motion_state == cfg['foscam']['state']['no alarm']) and (motion_detect == cfg['foscam']['state']['alarm']):
+                    #log_client.warning('Alarm triggered!')
+                    pushover_client.message('Alarm triggered!', snapshot(), 'GuardHouse Security', 'high', 'alien')
+                last_motion_state = motion_detect
 
             # Light handling
             if (time.time() - light_timer) > cfg['motor']['hysteresis']:
