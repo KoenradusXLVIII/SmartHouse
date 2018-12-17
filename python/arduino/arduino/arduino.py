@@ -14,7 +14,7 @@ class Client:
     def get_value(self,var):
         url = self.url + var.lower()
         r = requests.get(url).json()
-        return r[var.lower()]
+        return float(r[var.lower()])
 
     def get_all(self):
         url = self.url + 'all'
@@ -24,5 +24,5 @@ class Client:
     def set_value(self, var, value):
         url = self.url + var.lower() + '/' + str(value)
         r = requests.get(url).json()
-        if r[var.lower()] == int(value):
+        if float(r[var.lower()]) == float(value):
             return True

@@ -5,6 +5,7 @@ import time
 import pushover
 import logger
 import arduino
+import hue
 import signal
 import sys
 from xml.etree import ElementTree as ET
@@ -22,6 +23,8 @@ log_client = logger.Client(name='foscam', log_level='info', pushover_client=push
 # Set up Guard House Arduino client
 arduino_client = arduino.Client(cfg['guardhouse']['url'])
 
+# Set up Hue client
+hue_client = hue.Client(cfg['hue']['ip'])
 
 def main():
     # Initialize variables
@@ -44,10 +47,16 @@ def main():
             if arduino_client.set_value('day_night', infra_led_state):
                 if infra_led_state:  # night
                     log_client.info('Transition to night written to Guard House API')
+                    # If no one home turns lights on in 'not home' mode
+                    if hue_client.get_all_off():
+                        hue.client.set_scene('Not home')
+                        log_client.info('Switching lights on to \'Not home\' mode')
                 else:  # day
                     log_client.info('Transition to day written to Guard House API')
             else:
-                log_client.warning('Failed to write \'infra_led_state\' to Guard House API')
+                log_client.warning('Failed to write \'day_night\' to Guard House API')
+
+        last_infra_led_state = infra_led_state
 
         # Check for motion detection
         motion_detect = foscam_dev_state.find('motionDetectAlarm').text
