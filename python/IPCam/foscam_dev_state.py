@@ -41,7 +41,7 @@ def main():
         foscam_dev_state = devstate()
 
         # Check to see if infrared LEDs on (detect day/night transition)
-        infra_led_state = foscam_dev_state.find('infraLedState').text
+        infra_led_state = int(foscam_dev_state.find('infraLedState').text)
         if infra_led_state != last_infra_led_state:
             # Update Guard House API
             if arduino_client.set_value('day_night', infra_led_state):
