@@ -19,7 +19,7 @@ class Meas{
     // read measurements
     function read(){
         // select all query
-        $query = "SELECT p.id, p.timestamp, p.sensor_id, p.value FROM " . $this->table_name . " p ORDER BY p.timestamp DESC";
+        $query = "SELECT meas.timestamp, sensors.name, meas.value, quantities.uom, quantities.name as quantity FROM `meas` LEFT JOIN sensors on meas.sensor_id=sensors.id LEFT JOIN quantities ON sensors.quantity_id=quantities.id";
 
         // prepare query statement
         $stmt = $this->conn->prepare($query);

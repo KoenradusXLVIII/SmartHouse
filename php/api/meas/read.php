@@ -35,9 +35,11 @@ if($num>0){
         extract($row);
 
         $meas_item=array(
-            "id" => $id,
+            "timestamp" => $timestamp,
+            "sensor_name" => $name,
             "value" => $value,
-            "sensor_id" => $sensor_id
+            "uom" => $uom,
+            "quantity" => $quantity
         );
 
         array_push($meas_arr["records"], $meas_item);

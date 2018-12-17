@@ -9,6 +9,7 @@ import os
 from P1 import read_telegram
 from diff import diff
 import logger
+import nebula
 
 # Set up logger
 log_client = logger.Client(name='pvoutput')
@@ -17,6 +18,9 @@ log_client = logger.Client(name='pvoutput')
 path = os.path.dirname(os.path.realpath(__file__))
 fp = open(path + '/config.yaml', 'r')
 cfg = yaml.load(fp)
+
+# Set up Nebula API
+nebula_client = nebula.Client(cfg['nebula']['url'])
 
 # Check command line parameters
 local = False  # Upload to PVOutput
@@ -130,6 +134,12 @@ def main():
     if not local:
         r = requests.post(pvoutput_energy, headers=headers)
         log_client.info('Energy data upload: %s' % r.content)
+
+    # Nebula
+    nebula_client.set_meas(3, temp)
+    nebula_client.set_meas(4, humi)
+    nebula_client.set_meas(5, P_cons)
+    nebula_client.set_meas(6, P_PV)
 
     log_client.debug('=== END OF SESSION ===')
 
