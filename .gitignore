@@ -16,3 +16,4 @@ python/pushover/test_pushover.py
 python/logger/test.py
 python/pushover-test/
 arduino/JSONLibrary/json_library/json_library.ino
+php/api/config/database.php

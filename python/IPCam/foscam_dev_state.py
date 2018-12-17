@@ -49,7 +49,7 @@ def main():
                     log_client.info('Transition to night written to Guard House API')
                     # If no one home turns lights on in 'not home' mode
                     if hue_client.get_all_off():
-                        hue.client.set_scene('Not home')
+                        hue_client.set_scene('Not home')
                         log_client.info('Switching lights on to \'Not home\' mode')
                 else:  # day
                     log_client.info('Transition to day written to Guard House API')
