@@ -19,7 +19,7 @@ class Client:
                 if self.lights[id].on:
                     # Light is on, verify xy brightness and color (xy)
                     if not scene['lights'][id]['brightness'] == self.lights[id].brightness or \
-                            not scene['lights'][id]['xy'] == self.lights[id].xy:
+                            not self.compare_xy(scene['lights'][id]['xy'], self.lights[id].xy, scene['xy_tolerance']):
                         return False
                 else:
                     return False
@@ -29,6 +29,13 @@ class Client:
                     return False
 
         return True
+
+    def compare_xy(self, xy_scene, xy_lights, xy_tolerance):
+        if (xy_lights[0] > (xy_scene[0] - xy_tolerance)) and (xy_lights[0] < (xy_scene[0] + xy_tolerance)):
+            if (xy_lights[1] > (xy_scene[1] - xy_tolerance)) and (xy_lights[1] < (xy_scene[1] + xy_tolerance)):
+                return True
+
+        return False
 
 
     def get_scene_id_by_name(self, name):
