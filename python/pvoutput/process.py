@@ -92,6 +92,14 @@ def main():
         humi = data_json['humi']
         rain = data_json['rain']
         soil_humi = data_json['soil_humi']
+        GuardHouseDoor = data_json['door_state']
+        GuardHouseLight = data_json['light_state']
+        GuardHouseValve = data_json['valve_state']
+        GuardHouseAlarmMode = data_json['alarm_mode']
+        GuardHouseLightMode = data_json['light_mode']
+        GuardHouseWaterMode = data_json['water_mode']
+        MotorLight = data_json['motor_light']
+        DayNight = data_json['day_night']
     except:
         log_client.error('No data received from GuardHouse')
         temp = 0
@@ -140,6 +148,17 @@ def main():
     nebula_client.set_meas(4, humi)
     nebula_client.set_meas(5, P_cons)
     nebula_client.set_meas(6, P_PV)
+    nebula_client.set_meas(7, H2O)
+    nebula_client.set_meas(8, rain)
+    nebula_client.set_meas(9, soil_humi)
+    nebula_client.set_meas(10, GuardHouseDoor)
+    nebula_client.set_meas(11, GuardHouseLight)
+    nebula_client.set_meas(13, GuardHouseValve)
+    nebula_client.set_meas(16, GuardHouseAlarmMode)
+    nebula_client.set_meas(17, GuardHouseLightMode)
+    nebula_client.set_meas(18, GuardHouseWaterMode)
+    nebula_client.set_meas(19, MotorLight)
+    nebula_client.set_meas(20, DayNight)
 
     log_client.debug('=== END OF SESSION ===')
 
