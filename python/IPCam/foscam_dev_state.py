@@ -11,7 +11,7 @@ import sys
 from xml.etree import ElementTree as ET
 
 # Load configuration YAML
-fp = open('config.yaml','r')
+fp = open('config.yaml', 'r')
 cfg = yaml.load(fp)
 
 # Set up Pushover client
@@ -26,11 +26,13 @@ arduino_client = arduino.Client(cfg['guardhouse']['url'])
 # Set up Hue client
 hue_client = hue.Client(cfg['hue']['ip'])
 
+
 def main():
     # Initialize variables
     last_motion_state = cfg['foscam']['state']['no alarm']
     last_infra_led_state = 0
-    light_timer = 0
+    motor_light_state = 0
+    motion_timer = 0
     log_client.info('Foscam and Pushover monitoring scripts activated.')
 
     while True:
@@ -60,32 +62,39 @@ def main():
 
         # Check for motion detection
         motion_detect = foscam_dev_state.find('motionDetectAlarm').text
-        if motion_detect:
-            # Alarm handling
-            if arduino_client.get_value('alarm_mode'):
-                if (last_motion_state == cfg['foscam']['state']['no alarm']) and (motion_detect == cfg['foscam']['state']['alarm']):
-                    #log_client.warning('Alarm triggered!')
+        if (last_motion_state == cfg['foscam']['state']['no alarm']) and (
+                motion_detect == cfg['foscam']['state']['alarm']):
+            if (time.time() - motion_timer) > cfg['motor']['hysteresis']:
+                # Alarm handling
+                if arduino_client.get_value('alarm_mode'):
                     pushover_client.message('Alarm triggered!', snapshot(), 'GuardHouse Security', 'high', 'alien')
-                last_motion_state = motion_detect
 
-            # Light handling
-            if (time.time() - light_timer) > cfg['motor']['hysteresis']:
-                # Last change to light setting was more then the hysteresis limit, so a change is allowed
+                # Light handling
                 if arduino_client.get_value('day_night'):
-                    # It is dark out so we should turn the light on
-                    if not arduino_client.get_value('motor_light'):
-                        # Turn light on if it is off
-                        if not arduino_client.set_value('motor_light', 1):
+                    # It is dark out so we should turn the light on if...
+                    if not motor_light_state:
+                        # ... it is off
+                        motor_light_state = 1
+                        if arduino_client.set_value('motor_light', motor_light_state):
+                            log_client.debug('Wrote \'HIGH\' to \'motor_light\' to the Guard House API')
+                        else:
                             log_client.warning('Failed to write \'motor_light\' to the Guard House API')
-                        # Set the hysteresis timer
-                        light_timer = time.time()
+
+            motion_timer = time.time()
+
         else:
             # Light handling
-            if (time.time() - light_timer) > cfg['motor']['hysteresis']:
+            if (time.time() - motion_timer) > cfg['motor']['hysteresis']:
                 # Last change to light setting was more then the hysteresis limit, so a change is allowed
-                # There is no motion detected so we turn the light off
-                if not arduino_client.set_value('motor_light', 0):
-                    log_client.warning('Failed to write \'motor_light\' to the Guard House API')
+                if motor_light_state:
+                    # There is no motion detected and the light is on so we turn the light off
+                    motor_light_state = 0
+                    if arduino_client.set_value('motor_light', motor_light_state):
+                        log_client.debug('Wrote \'LOW\' to \'motor_light\' to the Guard House API')
+                    else:
+                        log_client.warning('Failed to write \'motor_light\' to the Guard House API')
+
+        last_motion_state = motion_detect
 
 
 def devstate():
@@ -94,7 +103,7 @@ def devstate():
         cgi_url = cfg['foscam']['motor']['url'] + cfg['foscam']['motor']['cgi']
         payload = {'usr': cfg['foscam']['motor']['user'], 'pwd': cfg['foscam']['motor']['pass'], 'cmd': 'getDevState'}
         r = requests.get(cgi_url, params=payload)
-        return ET.fromstring(r.text)    # Extract XML tree
+        return ET.fromstring(r.text)  # Extract XML tree
     except:
         log_client.warning('Unable to read device status [invalid response from Foscam API]')
         return None
@@ -106,7 +115,7 @@ def snapshot():
         cgi_url = cfg['foscam']['motor']['url'] + cfg['foscam']['motor']['cgi']
         payload = {'usr': cfg['foscam']['motor']['user'], 'pwd': cfg['foscam']['motor']['pass'], 'cmd': 'snapPicture'}
         r = requests.get(cgi_url, params=payload)
-        reg = re.search('(Snap_\d{8}-\d{6}.jpg)',r.text)    # Get snapshot name: Snap_YYYYMMDD_HHMMSS.jpg
+        reg = re.search('(Snap_\d{8}-\d{6}.jpg)', r.text)  # Get snapshot name: Snap_YYYYMMDD_HHMMSS.jpg
         snap_url = cfg['foscam']['motor']['url'] + 'snapPic/' + reg.group(1)
         r = requests.get(snap_url)
         return r.content
