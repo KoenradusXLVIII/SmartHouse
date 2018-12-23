@@ -21,7 +21,7 @@ pushover_client = pushover.Client(cfg['pushover']['token'], cfg['pushover']['use
 log_client = logger.Client(name='foscam', log_level='info', pushover_client=pushover_client)
 
 # Set up Guard House Arduino client
-arduino_client = arduino.Client(cfg['guardhouse']['url'])
+arduino_client = arduino.Client(cfg['guardhouse']['ip'])
 
 # Set up Hue client
 hue_client = hue.Client(cfg['hue']['ip'])

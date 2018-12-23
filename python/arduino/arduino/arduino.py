@@ -2,8 +2,9 @@ import requests
 
 
 class Client:
-    def __init__(self, url):
-        self.url = url
+    def __init__(self, ip):
+        self.ip = ip
+        self.url = 'http://' + ip + '/'
 
     def get_url(self):
         return self.url
