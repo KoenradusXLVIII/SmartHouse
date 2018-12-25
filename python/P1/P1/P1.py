@@ -18,7 +18,7 @@ OBIS = [
 
 class Client:
 
-    def __init__(self, port, serial_no):
+    def __init__(self, port):
         # Serial port configuration
         self.ser = serial.Serial()
         self.ser.port = port
@@ -28,8 +28,7 @@ class Client:
         self.ser.stopbits = 1
 
         # P1 configuration
-        self.serial_no = serial_no
-        self.telegram = ''
+        self.telegram = []
         self.crc_data = ''
 
         # Logger configuration
@@ -47,24 +46,24 @@ class Client:
             try:
                 self.ser.open()
                 if self.logger:
-                    self.logger.debug('Opened serial port \'%s\'' % self.port)
+                    self.logger.debug('Opened serial port \'%s\'' % self.ser.port)
                 return True
             except serial.SerialException:
                 if self.logger:
-                    self.logger.error('Failed to open serial port \'%s\'' % self.port)
+                    self.logger.error('Failed to open serial port \'%s\'' % self.ser.port)
                 return False
         else:
             if self.logger:
-                self.logger.debug('Tried to open port \'%s\', but it was already open' % self.port)
+                self.logger.debug('Tried to open port \'%s\', but it was already open' % self.ser.port)
 
     def close_port(self):
         if self.ser.isOpen():
             self.ser.close()
             if self.logger:
-                self.logger.debug('Closed serial port \'%s\'' % self.port)
+                self.logger.debug('Closed serial port \'%s\'' % self.ser.port)
         else:
             if self.logger:
-                self.logger.debug('Tried to close port \'%s\', but it was already closed' % self.port)
+                self.logger.debug('Tried to close port \'%s\', but it was already closed' % self.ser.port)
 
     def read_line(self):
         if self.ser.isOpen():
@@ -72,11 +71,13 @@ class Client:
 
     def add_line_to_telegram(self, line, add_to_crc='True'):
         self.telegram.append(line.strip())
+        if self.logger:
+            self.logger.debug('[P1]: %s' % line.strip())
         if add_to_crc:
             self.crc_data += line
 
     def new_telegram(self):
-        self.telegram = ''
+        self.telegram = []
         self.crc_data = ''
 
     def verify_crc(self):
@@ -134,8 +135,8 @@ class Client:
             # Start receiving data
             line = self.read_line()
 
-            # Find start of transmission [serial number]
-            while self.serial_no not in line:
+            # Find start of transmission [first line starts with '/']
+            while not line.startswith('/'):
                 line = self.read_line()
                 itt += 1
                 if itt >= TELEGRAM_LENGTH:
@@ -146,8 +147,6 @@ class Client:
             # Start of transmission detected
             self.new_telegram()
             self.add_line_to_telegram(line)
-            if self.logger:
-                self.logger.debug('[P1]: %s' % line.strip())
 
             # Read until end of telegram character detected
             while not line.startswith(EOT_CHAR):
@@ -157,9 +156,11 @@ class Client:
                 else:
                     # Do not add line with EOT char to CRC
                     self.add_line_to_telegram(line, False)
+            self.close_port()
 
             # Verify CRC
             if self.verify_crc():
                 self.process_telegram()
-
-
+                return True
+            else:
+                return False

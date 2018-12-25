@@ -1,111 +1,74 @@
+# Public packages
 import requests
 import datetime
-import serial
-import urllib
-import json
 import sys
 import yaml
 import os
-from P1 import read_telegram
-from diff import diff
+
+# Private packages
+import P1
 import logger
 import nebula
-
-# Set up logger
-log_client = logger.Client(name='pvoutput')
+import arduino
+import pushover
+from diff import diff # TODO
 
 # Load configuration YAML
 path = os.path.dirname(os.path.realpath(__file__))
 fp = open(path + '/config.yaml', 'r')
 cfg = yaml.load(fp)
 
-# Set up Nebula API
+# Set up Pushover client
+pushover_client = pushover.Client(cfg['pushover']['token'], cfg['pushover']['user'])
+
+# Set up Logger and attach Pushover client
+log_client = logger.Client(name='pvoutput')
+log_client.attach_pushover(pushover_client)
+
+# Set up Nebula API client
 nebula_client = nebula.Client(cfg['nebula']['url'])
+
+# Set up Arduino API clients
+arduino_guardhouse = arduino.Client(cfg['arduino']['guardhouse']['ip'])
+arduino_mainhouse = arduino.Client(cfg['arduino']['mainhouse']['ip'])
+
+# Set up P1 client
+p1_client = P1.Client('/dev/ttyUSB0')
+p1_client.read_telegram()
 
 # Check command line parameters
 local = False  # Upload to PVOutput
 verbose = False  # Verbose output
 if (len(sys.argv) > 1):
-    if ('v' in sys.argv[1]):
+    if 'v' in sys.argv[1]:
         verbose = True
-    if ('l' in sys.argv[1]):
+    if 'l' in sys.argv[1]:
         local = True
-
-# Initialize variables
-try:
-    log_client.debug('Trying to open serial port %s at baudrate %s [%s/%d/%d]' % (
-    cfg['serial']['port'], cfg['serial']['baudrate'], cfg['serial']['parity'], cfg['serial']['bytesize'],
-    cfg['serial']['stopbits']))
-    ser = serial.Serial(cfg['serial']['port'], cfg['serial']['baudrate'], cfg['serial']['bytesize'],
-                        cfg['serial']['parity'], cfg['serial']['stopbits'])
-except:
-    log_client.error('Unable to open serial port %s at baudrate %s [%s/%d/%d]' % (
-    cfg['serial']['port'], cfg['serial']['baudrate'], cfg['serial']['parity'], cfg['serial']['bytesize'],
-    cfg['serial']['stopbits']))
-    sys.exit()
 
 
 def main():
-    # Start new session
-    log_client.debug('=== START OF SESSION ===')
-
-    # Get solar and water data
-    try:
-        log_client.debug('Accessing Main House web service at %s' % cfg['arduino_url']['mainhouse'])
-        response = urllib.urlopen(cfg['arduino_url']['mainhouse'])
-        data_json = json.loads(response.read())
-        E_PV = data_json['E_PV']
-        P_PV = data_json['P_PV']
-        H2O = data_json['H2O']
+    # Get PV and Water data
+    data_mainhouse = arduino_mainhouse.get_all()
+    if data_mainhouse is not None:
         # Post-process water data
-        H2O = diff(H2O, 'H2O')
-    except:
+        data_mainhouse['H2O'] = diff(data_mainhouse['H2O'], 'H2O')
+    else:
         log_client.error('No data received from Main House')
         sys.exit()
 
     # Get P1 data
-    # Initialize variables
-    E_net = -1
-    P_net = -1
     itt = 0
-    while (E_net == -1) and (itt < cfg['p1']['retries']):
-        [P_net, E_net] = read_telegram(ser, log_client, cfg['serial']['port'])
-        if verbose:
-            print('Power: %s' % P_net)
-            print('Energy: %s' % E_net)
+    while not p1_client.read_telegram() and itt < cfg['P1']['retries']:
         itt += 1
 
-    if itt == cfg['p1']['retries']:  # No valid value received within maximum number of tries
+    if itt == cfg['P1']['retries']:  # No valid value received within maximum number of tries
         log_client.error('No valid P1 data after %d retries' % itt - 1)
         sys.exit()
 
-    # Compute Power and Energy Consumption
-    E_cons = E_PV + E_net  # v3
-    P_cons = P_PV + P_net  # v4
-
     # Get extended data
-    try:
-        log_client.debug('Accessing Guard House web service at %s' % cfg['arduino_url']['mainhouse'])
-        response = urllib.urlopen(cfg['arduino_url']['guardhouse'])
-        data_json = json.loads(response.read())
-        temp = data_json['temp']
-        humi = data_json['humi']
-        rain = data_json['rain']
-        soil_humi = data_json['soil_humi']
-        GuardHouseDoor = data_json['door_state']
-        GuardHouseLight = data_json['light_state']
-        GuardHouseValve = data_json['valve_state']
-        GuardHouseAlarmMode = data_json['alarm_mode']
-        GuardHouseLightMode = data_json['light_mode']
-        GuardHouseWaterMode = data_json['water_mode']
-        MotorLight = data_json['motor_light']
-        DayNight = data_json['day_night']
-    except:
+    data_guardhouse = arduino_guardhouse.get_all()
+    if data_guardhouse is None:
         log_client.error('No data received from GuardHouse')
-        temp = 0
-        humi = 0
-        rain = 0
-        soil_humi = 0
 
     #  Prepare PVOutput headers
     headers = {
@@ -113,55 +76,35 @@ def main():
         'X-Pvoutput-SystemId': cfg['pvoutput']['sid']
     }
 
-    # Prepare data
-    date_str = datetime.datetime.today().strftime('%Y%m%d')
-    time_str = datetime.datetime.today().strftime('%H:%M')
-
-    # Logging data
-    log_client.debug('Date: %s' % date_str)
-    log_client.debug('Time: %s' % time_str)
-    log_client.debug('Power Generation: %s W' % P_PV)
-    log_client.debug('Power Consumption: %s W' % P_cons)
-    log_client.debug('Energy Generation: %s Wh' % E_PV)
-    log_client.debug('Energy Net Import: %s Wh' % E_net)
-    log_client.debug('Energy Consumption: %s Wh' % E_cons)
-    log_client.debug('Water Consumption: %s liter' % H2O)
-    log_client.debug('Temperature: %s C' % temp)
-    log_client.debug('Humidity: %s %%' % humi)
-    log_client.debug('Rain: %s ml' % rain)
-    log_client.debug('Soil Humidity: %s %%' % soil_humi)
-
-    # Prepare API data
-    pvoutput_energy = cfg['pvoutput']['url'] +\
-                      '?d=%s&t=%s&v1=%s&v2=%s&v3=%s&v4=%s&v7=%s&v8=%s&v9=%s&v11=%s&v12=%s&c1=1' % \
-                      (date_str, time_str, E_PV, P_PV, E_cons, P_cons, temp, humi, H2O, rain, soil_humi)
-    log_client.debug('Request: %s' % pvoutput_energy)
-    log_client.debug('Headers: %s' % headers)
+    # Prepare PVOutput payload
+    payload = {
+        'd': datetime.datetime.today().strftime('%Y%m%d'),              # Date [yyyymmdd]
+        't': datetime.datetime.today().strftime('%H:%M'),               # Time [hh:mm]
+        'c1': 1,                                                        # Cumulative Flag [-]
+        'v1': data_mainhouse['E_PV'],                                   # Energy Generation [Wh]
+        'v2': data_mainhouse['P_PV'],                                   # Power Generation [W]
+        'v3': data_mainhouse['E_PV'] + p1_client.get_energy(),          # Energy Consumption [Wh]
+        'v4': data_mainhouse['P_PV'] + p1_client.get_power(),           # Power Consumption [W]
+    }
+    if data_guardhouse is not None:
+        payload.update({
+            'v7': data_guardhouse['temp'],                              # Temperature [C]
+            'v8': data_guardhouse['humi'],                              # Humidity [%]
+            'v9': data_mainhouse['H2O'],                                # Water Consumption [l]
+            'v11': data_guardhouse['rain'],                             # Precipitation [mm]
+            'v12': data_guardhouse['soil_humi']                         # Soil Humidity [%]
+        })
+    log_client.debug('PVOutput payload: %s' % payload)
+    if verbose:
+        print('PVOutput payload: %s' % payload)
 
     # Upload
     if not local:
-        r = requests.post(pvoutput_energy, headers=headers)
+        r = requests.post(cfg['pvoutput']['url'], headers=headers, params=payload)
         log_client.info('Energy data upload: %s' % r.content)
 
     # Nebula
-    nebula_client.set_meas(3, temp)
-    nebula_client.set_meas(4, humi)
-    nebula_client.set_meas(5, P_cons)
-    nebula_client.set_meas(6, P_PV)
-    nebula_client.set_meas(7, H2O)
-    nebula_client.set_meas(8, rain)
-    nebula_client.set_meas(9, soil_humi)
-    nebula_client.set_meas(10, GuardHouseDoor)
-    nebula_client.set_meas(11, GuardHouseLight)
-    nebula_client.set_meas(13, GuardHouseValve)
-    nebula_client.set_meas(16, GuardHouseAlarmMode)
-    nebula_client.set_meas(17, GuardHouseLightMode)
-    nebula_client.set_meas(18, GuardHouseWaterMode)
-    nebula_client.set_meas(19, MotorLight)
-    nebula_client.set_meas(20, DayNight)
-
-    log_client.debug('=== END OF SESSION ===')
-
+    # nebula_client.upload(payload)
 
 if __name__ == "__main__":
     main()

@@ -1,3 +1,5 @@
+# Run with logging: python foscam_dev_state.py >> foscam_dev_state.py.log 2>&1 &
+
 import requests
 import re
 import yaml
@@ -18,7 +20,8 @@ cfg = yaml.load(fp)
 pushover_client = pushover.Client(cfg['pushover']['token'], cfg['pushover']['user'])
 
 # Set up logger client
-log_client = logger.Client(name='foscam', log_level='info', pushover_client=pushover_client)
+log_client = logger.Client(name='foscam', log_level='debug')
+log_client.attach_pushover(pushover_client)
 
 # Set up Guard House Arduino client
 arduino_client = arduino.Client(cfg['guardhouse']['ip'])
@@ -33,7 +36,7 @@ def main():
     last_infra_led_state = 0
     motor_light_state = 0
     motion_timer = 0
-    log_client.info('Foscam and Pushover monitoring scripts activated.')
+    log_client.info('Foscam and Pushover monitoring scripts activated')
 
     while True:
         # Sleep for 5 seconds
@@ -65,6 +68,7 @@ def main():
         if (last_motion_state == cfg['foscam']['state']['no alarm']) and (
                 motion_detect == cfg['foscam']['state']['alarm']):
             if (time.time() - motion_timer) > cfg['motor']['hysteresis']:
+                log_client.debug('New motion detected outside hysteresis interval, starting counter')
                 # Alarm handling
                 if arduino_client.get_value('alarm_mode'):
                     pushover_client.message('Alarm triggered!', snapshot(), 'GuardHouse Security', 'high', 'alien')
@@ -79,6 +83,8 @@ def main():
                             log_client.debug('Wrote \'HIGH\' to \'motor_light\' to the Guard House API')
                         else:
                             log_client.warning('Failed to write \'motor_light\' to the Guard House API')
+            else:
+                log_client.debug('Motion detected within hysteresis interval, resetting counter')
 
             motion_timer = time.time()
 
@@ -133,4 +139,5 @@ def exit_gracefully(sig, frame):
 signal.signal(signal.SIGINT, exit_gracefully)
 signal.signal(signal.SIGTERM, exit_gracefully)
 if __name__ == "__main__":
+    print('Foscam and Pushover monitoring scripts activated')
     main()
