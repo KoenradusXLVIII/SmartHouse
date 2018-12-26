@@ -26,7 +26,7 @@ log_client = logger.Client(name='pvoutput')
 log_client.attach_pushover(pushover_client)
 
 # Set up Nebula API client
-nebula_client = nebula.Client(cfg['nebula']['url'])
+nebula_client = nebula.Client(cfg['nebula']['url'],cfg['nebula']['key'])
 
 # Set up Arduino API clients
 arduino_guardhouse = arduino.Client(cfg['arduino']['guardhouse']['ip'])
@@ -98,13 +98,40 @@ def main():
     if verbose:
         print('PVOutput payload: %s' % payload)
 
-    # Upload
+    # Post PVOutput payload
     if not local:
         r = requests.post(cfg['pvoutput']['url'], headers=headers, params=payload)
         log_client.info('Energy data upload: %s' % r.content)
 
-    # Nebula
-    # nebula_client.upload(payload)
+    # Prepare Nebula payload
+    payload = {
+        '6':  data_mainhouse['P_PV'],                                   # Power Generation [W]
+        '5':  data_mainhouse['P_PV'] + p1_client.get_power(),           # Power Consumption [W]
+        '22': p1_client.get_energy()                                    # Net Energy Consumption [W]
+    }
+    if data_guardhouse is not None:
+        payload.update({
+            '3':  data_guardhouse['temp'],                              # Temperature [C]
+            '4':  data_guardhouse['humi'],                              # Humidity [%]
+            '7':  data_mainhouse['H2O'],                                # Water Consumption [l]
+            '8':  data_guardhouse['rain'],                              # Precipitation [mm]
+            '9':  data_guardhouse['soil_humi'],                         # Soil Humidity [%]
+            '10': data_guardhouse['door_state'],                        # Door State [-]
+            '11': data_guardhouse['light_state'],                       # Light State [On/Off]
+            '13': data_guardhouse['valve_state'],                       # Valve State [Open/Close]
+            '16': data_guardhouse['alarm_mode'],                        # Alarm Mode [On/Off]
+            '17': data_guardhouse['light_mode'],                        # Light Mode [Auto/Manual]
+            '18': data_guardhouse['water_mode'],                        # Water Mode [Auto/Manual]
+            '19': data_guardhouse['motor_light'],                       # Motor Light [On/Off]
+            '20': data_guardhouse['day_night'],                         # Time of Day [Day/Night]
+        })
+    log_client.debug('PVOutput payload: %s' % payload)
+    if verbose:
+        print('PVOutput payload: %s' % payload)
+
+    # Post Nebula payload
+    nebula_client.add_many(payload)
+    nebula_client.post_payload()
 
 if __name__ == "__main__":
     main()

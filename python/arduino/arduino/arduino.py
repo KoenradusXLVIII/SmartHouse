@@ -14,16 +14,29 @@ class Client:
 
     def get_value(self,var):
         url = self.url + var.lower()
-        r = requests.get(url).json()
-        return float(r[var.lower()])
+        try:
+            r = requests.get(url).json()
+            return float(r[var.lower()])
+        except:
+            return None
 
     def get_all(self):
         url = self.url + 'all'
-        r = requests.get(url).json()
-        return r
+        try:
+            r = requests.get(url).json()
+            return r
+        except:
+            return None
+
 
     def set_value(self, var, value):
         url = self.url + var.lower() + '/' + str(value)
-        r = requests.get(url).json()
-        if float(r[var.lower()]) == float(value):
-            return True
+        try:
+            r = requests.get(url).json()
+            if float(r[var.lower()]) == float(value):
+                return True
+            else:
+                return False
+        except:
+            return False
+
