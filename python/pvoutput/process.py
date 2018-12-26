@@ -107,7 +107,7 @@ def main():
     payload = {
         '6':  data_mainhouse['P_PV'],                                   # Power Generation [W]
         '5':  data_mainhouse['P_PV'] + p1_client.get_power(),           # Power Consumption [W]
-        '22': p1_client.get_energy()                                    # Net Energy Consumption [W]
+        '22': p1_client.get_energy() / 1000.0                           # Net Energy Consumption [kWh]
     }
     if data_guardhouse is not None:
         payload.update({
