@@ -1,16 +1,20 @@
 # Run with logging: python foscam_dev_state.py >> foscam_dev_state.py.log 2>&1 &
 
+# Public pacakages
 import requests
 import re
 import yaml
 import time
+import signal
+import sys
+from xml.etree import ElementTree as ET
+
+# Personal
+import nebula
 import pushover
 import logger
 import arduino
 import hue
-import signal
-import sys
-from xml.etree import ElementTree as ET
 
 # Load configuration YAML
 fp = open('config.yaml', 'r')
@@ -29,6 +33,9 @@ arduino_client = arduino.Client(cfg['guardhouse']['ip'])
 # Set up Hue client
 hue_client = hue.Client(cfg['hue']['ip'])
 
+# Set up Nebula API client
+nebula_client = nebula.Client(cfg['nebula']['url'],cfg['nebula']['key'])
+
 
 def main():
     # Initialize variables
@@ -36,8 +43,8 @@ def main():
     last_infra_led_state = 0
     motor_light_state = 0
     motion_timer = 0
-    log_client.info('Foscam and Pushover monitoring scripts activated')
 
+    log_client.info('Foscam and Pushover monitoring scripts activated')
     while True:
         # Sleep for 5 seconds
         time.sleep(5)
@@ -67,6 +74,9 @@ def main():
         motion_detect = foscam_dev_state.find('motionDetectAlarm').text
         if (last_motion_state == cfg['foscam']['state']['no alarm']) and (
                 motion_detect == cfg['foscam']['state']['alarm']):
+            # Log to Nebula
+            #nebula_client.post_single(29,motion_detect) TODO: needs 5 minute flattening
+
             if (time.time() - motion_timer) > cfg['motor']['hysteresis']:
                 log_client.debug('New motion detected outside hysteresis interval, starting counter')
                 # Alarm handling
@@ -87,6 +97,12 @@ def main():
                 log_client.debug('Motion detected within hysteresis interval, resetting counter')
 
             motion_timer = time.time()
+
+        elif (last_motion_state == cfg['foscam']['state']['alarm']) and (
+                motion_detect == cfg['foscam']['state']['no alarm']):
+            pass
+            # Log to Nebula
+            #nebula_client.post_single(29, motion_detect) TODO: needs 5 minute flattening
 
         else:
             # Light handling

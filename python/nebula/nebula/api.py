@@ -14,12 +14,22 @@ class Client:
         r = requests.get(url).json()
         return r['records']
 
-    def add_single(self, sensor_id, value):
-        self.payload['values'].append({'sensor_id': sensor_id, 'value': '%.2f' % value})
+    def add_single(self, sensor_id, value, post=False):
+        self.payload['values'].append({'sensor_id': sensor_id, 'value': '%.2f' % float(value())})
+        if post:
+            self.post_payload()
 
-    def add_many(self, payload):
+    def post_single(self, sensor_id, value):
+        self.add_single(sensor_id, value, True)
+
+    def add_many(self, payload, post=False):
         for sensor_id, value in payload.items():
             self.add_single(sensor_id, value)
+        if post:
+            self.post_payload()
+
+    def post_many(self, payload):
+        self.add_many(payload, True)
 
     def post_payload(self):
         url = self.url + '/api/meas/post.php'

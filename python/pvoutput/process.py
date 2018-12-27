@@ -6,7 +6,7 @@ import yaml
 import os
 import psutil
 
-# Private packages
+# Personal packages
 import P1
 import logger
 import nebula
@@ -44,12 +44,10 @@ arduino_mainhouse = arduino.Client(cfg['arduino']['mainhouse']['ip'])
 
 # Set up P1 client
 p1_client = P1.Client('/dev/ttyUSB0')
-p1_client.read_telegram()
-
 
 def main():
     # Get PV and Water data
-    if(verbose):
+    if verbose:
         print('Get PV and Water data...')
     data_mainhouse = arduino_mainhouse.get_all()
     if data_mainhouse is not None:
@@ -60,7 +58,7 @@ def main():
         sys.exit()
 
     # Get P1 data
-    if(verbose):
+    if verbose:
         print('Get P1 data...')
     itt = 0
     while not p1_client.read_telegram() and itt < cfg['P1']['retries']:
@@ -71,7 +69,7 @@ def main():
         sys.exit()
 
     # Get extended data
-    if(verbose):
+    if verbose:
         print('Get extended data...')
     data_guardhouse = arduino_guardhouse.get_all()
     if data_guardhouse is None:
@@ -104,7 +102,7 @@ def main():
 
     # Post PVOutput payload
     if not local:
-        if(verbose):
+        if verbose:
             print('Post PVOutput payload..')
             print('PVOutput payload: %s' % payload)
         r = requests.post(cfg['pvoutput']['url'], headers=headers, params=payload)
@@ -140,11 +138,10 @@ def main():
         })
 
     # Post Nebula payload
-    if(verbose):
+    if verbose:
             print('Post Nebula payload..')
             print('Nebula payload: %s' % payload)
-    nebula_client.add_many(payload)
-    nebula_client.post_payload()
+    nebula_client.post_many(payload)
 
 if __name__ == "__main__":
     main()

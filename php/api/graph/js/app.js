@@ -1,27 +1,30 @@
 $(document).ready(function(){
 	renderChart(3,4)
+	$('#left_sensors').multiselect();
+	$('#right_sensors').multiselect();
 });
 
-function renderChart(leftAxis, rightAxis) {
+function renderChart(left_axis, right_axis) {
+    //var jsonSensors = JSON.stringify(sensor_ids);
     $.ajax({
-    	url: "http://www.joostverberk.nl/api/graph/data.php?leftAxis=" + leftAxis + "&rightAxis=" + rightAxis,
-    	method: "GET",
+    	url: "http://www.joostverberk.nl/api/graph/data.php",
+    	dataType:'json',
+    	method: "POST",
+    	data: {sensors: [left_axis, right_axis]},
     	success: function(data) {
-    		console.log(data);
     		var timestamp = [];
     		var left = [];
     		var right = [];
-    		var url = "http://www.joostverberk.nl/api/graph/data.php?leftAxis=" + leftAxis + "&rightAxis=" + rightAxis;
-    
+
     		for(var i in data) {
-    			if(data[i].sensor_id==leftAxis) {
+    			if(data[i].sensor_id==left_axis) {
     			    timestamp.push(data[i].timestamp);
     			    left.push(data[i].value);
     			    left_quantity = data[i].quantity_name;
     			    left_sensor = data[i].sensor_name;
     			    left_uom = data[i].uom;
     			}
-    			if(data[i].sensor_id==rightAxis) {
+    			if(data[i].sensor_id==right_axis) {
     			    right.push(data[i].value);
     			    right_quantity = data[i].quantity_name;
     			    right_uom = data[i].uom;
@@ -103,6 +106,9 @@ function renderChart(leftAxis, rightAxis) {
                 }
     		};
     		var lineGraph = new Chart(ctx, config);
-    	}
+    	},
+    	error: function(response){
+            console.log(response);
+         }
     });
 }
