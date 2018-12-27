@@ -15,5 +15,5 @@ arduino/NTPWifi/config.h
 python/pushover/test_pushover.py
 python/pushover-test/
 arduino/JSONLibrary/json_library/json_library.ino
-php/api/config/database.php
 test.py
+php/api/config/
