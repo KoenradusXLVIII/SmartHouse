@@ -14,11 +14,7 @@ $database = new Database();
 $db = $database->getConnection();
 
 // Query database
-$query = "SELECT meas.sensor_id, meas.timestamp, meas.value, sensors.name AS sensor_name, quantities.name AS quantity_name, quantities.uom FROM meas LEFT JOIN sensors ON meas.sensor_id = sensors.id LEFT JOIN quantities ON sensors.quantity_id = quantities.id WHERE meas.sensor_id IN (";
-foreach ($_POST["sensors"] as $sensor) {
-    $query = $query . $sensor . ",";
-}
-$query = rtrim($query, ',') . ") AND timestamp >= NOW() - INTERVAL 2 DAY ORDER BY timestamp ASC";
+$query = "SELECT id, name FROM sensors WHERE quantity_id = " . $_POST["quantity_id"];
 $result = $db->query($query);
 
 // Loop through the returned data

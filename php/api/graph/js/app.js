@@ -1,7 +1,7 @@
 $(document).ready(function(){
-	renderChart([3],[4,9])
-	$('#left_sensors').multiselect();
-	$('#right_sensors').multiselect();
+	renderChart([3],[5,6])
+	$('#LeftAxisMultiDropdown').multiselect('rebuild');
+	$('#RightAxisMultiDropdown').multiselect('rebuild');
 });
 
 function renderChart(left_axis, right_axis) {
@@ -12,7 +12,6 @@ function renderChart(left_axis, right_axis) {
     	method: "POST",
     	data: {sensors: left_axis.concat(right_axis)},
     	success: function(data) {
-
             // Set colour sets
             var colorset = ["#003f5c","#7a5195","#ef5675","#ffa600"];
 
@@ -37,7 +36,7 @@ function renderChart(left_axis, right_axis) {
 					mode: 'index',
 					intersect: false,
 				},
-                responsive: true,
+                responsive: true,    
                 scales: {
                     xAxes: [{
                         type: 'time',
@@ -124,10 +123,10 @@ function renderChart(left_axis, right_axis) {
                         }
                     }
                 }
-
+            
             // Attach options
             config.options = options;
-
+                
             // Get timestamp information from first dataset
             for (var meas_id in data) {
                 if(data[meas_id].sensor_id == left_axis[0]) {
@@ -141,12 +140,12 @@ function renderChart(left_axis, right_axis) {
                 for (var all_sensor_i = 0; all_sensor_i < all_sensors.length; all_sensor_i++) {
                     if(data[i3].sensor_id == all_sensors[all_sensor_i]) {
                         config.data.datasets[all_sensor_i].data.push(data[i3].value);
-                        break;
+                        break;    
                     }
                 }
             }
 
-            console.log(config);
+            //console.log(config);
 
             // Draw chart
     		var lineGraph = new Chart(ctx, config);

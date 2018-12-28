@@ -46,11 +46,21 @@
             margin-top: 28px;
           }
         </style>
+        <style type="text/css">
+            .multiselect-container > li > a > label.checkbox
+            {
+                width: 350px;
+            }
+            .btn-group > .btn:first-child
+            {
+                width: 350px;
+            }
+        </style>
 	</head>
 	<body>
         <div class="container-narrow">
             <div>
-                <h3 class="muted">SensorNode</h3>
+                <h3 class="muted">SensorNode [last 48h]</h3>
                 <b>Left axis</b><br />
                 
                 <?php
@@ -69,11 +79,12 @@
                     $result = $db->query($query);
                     
                     // Query database
-                    $query = sprintf("SELECT sensors.id, sensors.name, quantities.uom FROM sensors LEFT JOIN quantities ON sensors.quantity_id = quantities.id WHERE user_id = 1 ORDER BY name ASC");
+                    //$query = sprintf("SELECT sensors.id, sensors.name, quantities.uom FROM sensors LEFT JOIN quantities ON sensors.quantity_id = quantities.id WHERE user_id = 1 ORDER BY name ASC");
+                    $query = "SELECT DISTINCT quantities.id,  quantities.name, quantities.uom FROM sensors LEFT JOIN quantities ON sensors.quantity_id = quantities.id";
                     $result = $db->query($query);
                     
                     // Populate dropdown
-                    echo "<select id='LeftAxisDropdown' onchange='updateGraph()' style='border-width:0px'>";
+                    echo "<select id='LeftAxisDropdown' onchange='updateLeftMultiDrop()' style='border-width:0px'>";
                     while ($row = $result->fetch_assoc()) {
                         if ($row['id']==3)
                         {
@@ -90,7 +101,7 @@
                     // Close connection
                     $db->close();
                 ?>
-                <select id="left_sensors" multiple="multiple"></select>
+                <select id="LeftAxisMultiDropdown" multiple="multiple" onchange='updateGraph()'></select>
                 </select>
                 <br />
                 
@@ -107,11 +118,11 @@
                     $db = $database->getConnection();
                     
                     // Query database
-                    $query = sprintf("SELECT sensors.id, sensors.name, quantities.uom FROM sensors LEFT JOIN quantities ON sensors.quantity_id = quantities.id WHERE user_id = 1 ORDER BY name ASC");
+                    $query = "SELECT DISTINCT quantities.id, quantities.name, quantities.uom FROM sensors LEFT JOIN quantities ON sensors.quantity_id = quantities.id";
                     $result = $db->query($query);
                     
                     // Populate dropdown
-                    echo "<select id='RightAxisDropdown' onchange='updateGraph()' style='border-width:0px'>";
+                    echo "<select id='RightAxisDropdown' onchange='updateRightMultiDrop()' style='border-width:0px'>";
                     while ($row = $result->fetch_assoc()) {
                         if ($row['id']==4)
                         {
@@ -128,7 +139,7 @@
                     // Close connection
                     $db->close();
                 ?>                
-                <select id="right_sensors" multiple="multiple">
+                <select id="RightAxisMultiDropdown" multiple="multiple" onchange='updateGraph()'>
                 </select>
                 <br /><br />                
                 
@@ -153,9 +164,53 @@
 		<script type="text/javascript" src="js/app.js"></script>
 
         <script type="text/javascript">
+            function updateLeftMultiDrop() {
+                $.ajax({
+                    url: "http://www.joostverberk.nl/api/graph/sensors.php",
+                    dataType:'json',
+                    method: "POST",
+                    data: {quantity_id: $('#LeftAxisDropdown').val()},
+                    success: function(data) {
+                        $('#LeftAxisMultiDropdown').empty();
+                        for (var i in data) {
+                            var option = document.createElement("option");
+                            option.text = data[i].name;
+                            option.value = data[i].id;
+                            $('#LeftAxisMultiDropdown').append(option);
+                            $('#LeftAxisMultiDropdown').multiselect('rebuild');
+                        }
+                    },
+                    error: function(response){
+                        console.log(response);
+                    }
+                });
+            }
+            
+            function updateRightMultiDrop() {
+                $.ajax({
+                    url: "http://www.joostverberk.nl/api/graph/sensors.php",
+                    dataType:'json',
+                    method: "POST",
+                    data: {quantity_id: $('#RightAxisDropdown').val()},
+                    success: function(data) {
+                        $('#RightAxisMultiDropdown').empty();
+                        for (var i in data) {
+                            var option = document.createElement("option");
+                            option.text = data[i].name;
+                            option.value = data[i].id;
+                            $('#RightAxisMultiDropdown').append(option);
+                            $('#RightAxisMultiDropdown').multiselect('rebuild');
+                        }
+                    },
+                    error: function(response){
+                        console.log(response);
+                    }
+                });
+            }
+        
             function updateGraph() {
-              var left_axis = document.getElementById("LeftAxisDropdown").value;
-              var right_axis = document.getElementById("RightAxisDropdown").value;
+              var left_axis = $('#LeftAxisMultiDropdown').val();
+              var right_axis = $('#RightAxisMultiDropdown').val();
               $('#graph-canvas').remove(); // this is my <canvas> element
               $('#graph-container').append('<canvas id="graph-canvas"><canvas>');
               renderChart(left_axis,right_axis);
