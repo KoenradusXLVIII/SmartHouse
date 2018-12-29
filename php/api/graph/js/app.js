@@ -1,9 +1,3 @@
-$(document).ready(function(){
-	renderChart([3],[5,6])
-	$('#LeftAxisMultiDropdown').multiselect('rebuild');
-	$('#RightAxisMultiDropdown').multiselect('rebuild');
-});
-
 function renderChart(left_axis, right_axis) {
     //var jsonSensors = JSON.stringify(sensor_ids);
     $.ajax({

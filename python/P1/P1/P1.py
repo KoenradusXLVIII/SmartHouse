@@ -1,11 +1,11 @@
 import re
-import sys
 from PyCRC.CRC16 import CRC16
 import serial
+from time import sleep
 
 # Constants
 EOT_CHAR = '!'  # End of transmission character
-TELEGRAM_LENGTH = 23  # lines
+TELEGRAM_LENGTH = 40  # lines
 OBIS = [
     ['Energy import [low]', '1-0:1.8.1', '(\d-\d):(\d\.?)+\((\d{6}\.\d{3})\*kWh\)'],
     ['Energy import [high]', '1-0:1.8.2', '(\d-\d):(\d\.?)+\((\d{6}\.\d{3})\*kWh\)'],
@@ -37,6 +37,8 @@ class Client:
         # Initialise local variables
         self.power = 0.0
         self.energy = 0.0
+        self.retries = 3
+        self.retry_delay = 10
 
     def attach_logger(self, logger):
         self.logger = logger
@@ -67,12 +69,13 @@ class Client:
 
     def read_line(self):
         if self.ser.isOpen():
-            return str(self.ser.readline())
+            line = self.ser.readline()
+            if self.logger:
+                self.logger.debug('[P1]: %s' % line.strip())
+            return str(line)
 
     def add_line_to_telegram(self, line, add_to_crc='True'):
         self.telegram.append(line.strip())
-        if self.logger:
-            self.logger.debug('[P1]: %s' % line.strip())
         if add_to_crc:
             self.crc_data += line
 
@@ -121,46 +124,49 @@ class Client:
         self.power *= 1000.0
         self.energy *= 1000.0
 
-    def get_power(self):
-        return self.power
-
-    def get_energy(self):
-        return self.energy
-
     def read_telegram(self):
-        itt = 0
 
         # Open serial port
-        if self.open_port():
-            # Start receiving data
-            line = self.read_line()
-
-            # Find start of transmission [first line starts with '/']
-            while not line.startswith('/'):
+        for itt in range(1,self.retries):
+            if self.logger:
+                self.logger.debug('Starting P1 iteration %d' % itt)
+            if self.open_port():
+                # Start receiving data
                 line = self.read_line()
-                itt += 1
-                if itt >= TELEGRAM_LENGTH:
+
+                # Find start of transmission [first line starts with '/']
+                line_no = 0
+                while not line.startswith('/'):
+                    line = self.read_line()
+                    line_no += 1
+                    if line_no >= TELEGRAM_LENGTH:
+                        self.close_port()
+                        break
+
+                if line_no >= TELEGRAM_LENGTH:
                     if self.logger:
-                        self.logger.error('Invalid telegram [serial number not found]')
-                        return False
-
-            # Start of transmission detected
-            self.new_telegram()
-            self.add_line_to_telegram(line)
-
-            # Read until end of telegram character detected
-            while not line.startswith(EOT_CHAR):
-                line = self.read_line()
-                if not line.startswith(EOT_CHAR):
-                    self.add_line_to_telegram(line)
+                        self.logger.warning('Invalid telegram [serial number not found]')
                 else:
-                    # Do not add line with EOT char to CRC
-                    self.add_line_to_telegram(line, False)
-            self.close_port()
+                    # Start of transmission detected
+                    self.new_telegram()
+                    self.add_line_to_telegram(line)
 
-            # Verify CRC
-            if self.verify_crc():
-                self.process_telegram()
-                return True
+                    # Read until end of telegram character detected
+                    while not line.startswith(EOT_CHAR):
+                        line = self.read_line()
+                        if not line.startswith(EOT_CHAR):
+                            self.add_line_to_telegram(line)
+                        else:
+                            # Do not add line with EOT char to CRC
+                            self.add_line_to_telegram(line, False)
+                    self.close_port()
+
+                    # Verify CRC
+                    if self.verify_crc():
+                        self.process_telegram()
+                        return True
             else:
-                return False
+                sleep(self.retry_delay)
+
+        # Failed to read after self.retries retries
+        return False

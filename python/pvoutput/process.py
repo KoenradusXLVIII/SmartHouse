@@ -60,12 +60,9 @@ def main():
     # Get P1 data
     if verbose:
         print('Get P1 data...')
-    itt = 0
-    while not p1_client.read_telegram() and itt < cfg['P1']['retries']:
-        itt += 1
 
-    if itt == cfg['P1']['retries']:  # No valid value received within maximum number of tries
-        log_client.error('No valid P1 data after %d retries' % itt - 1)
+    if not p1_client.read_telegram():
+        log_client.error('No valid P1 data after %d retries' % p1_client.retries)
         sys.exit()
 
     # Get extended data
@@ -112,8 +109,8 @@ def main():
     # Prepare Nebula payload
     payload = {
         '6':  data_mainhouse['P_PV'],                                       # Power Generation [W]
-        '5':  data_mainhouse['P_PV'] + p1_client.get_power(),               # Power Consumption [W]
-        '22': p1_client.get_energy() / 1000.0,                              # Net Energy Consumption [kWh]
+        '5':  data_mainhouse['P_PV'] + p1_client.power,                     # Power Consumption [W]
+        '22': p1_client.energy / 1000.0,                                    # Net Energy Consumption [kWh]
         '23': psutil.cpu_percent(),                                         # Current system-wide CPU utilization [%]
         '25': psutil.virtual_memory().percent,                              # Current memory usage [%]
         '26': psutil.disk_usage('/').percent,                               # Current disk usage [%]

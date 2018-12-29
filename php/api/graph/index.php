@@ -1,220 +1,77 @@
-<!DOCTYPE html>
-<html>
-	<head>
-		<title>SensorNode</title>
-        <link href="css/bootstrap.min.css" rel="stylesheet" type="text/css" />
-        <link href="css/bootstrap-multiselect.css" rel="stylesheet" type="text/css" />
-        <style type="text/css">
-          body {
-            padding-top: 20px;
-            padding-bottom: 40px;
-          }
-    
-          /* Custom container */
-          .container-narrow {
-            margin: 0 auto;
-            max-width: 700px;
-          }
-          .container-narrow > hr {
-            margin: 30px 0;
-          }
-    
-          /* Main marketing message and sign up button */
-          .jumbotron {
-            margin: 60px 0;
-            text-align: left;
-          }
-          .jumbotron h1 {
-            font-size: 72px;
-            line-height: 1;
-          }
-          .jumbotron h2 {
-            font-size: 36px;
-            line-height: 1;
-            text-align: center;
-          }
-          .jumbotron .btn {
-            font-size: 21px;
-            padding: 14px 24px;
-          }
-    
-          /* Supporting marketing content */
-          .marketing {
-            margin: 60px 0;
-          }
-          .marketing p + h4 {
-            margin-top: 28px;
-          }
-        </style>
-        <style type="text/css">
-            .multiselect-container > li > a > label.checkbox
-            {
-                width: 350px;
-            }
-            .btn-group > .btn:first-child
-            {
-                width: 350px;
-            }
-        </style>
-	</head>
-	<body>
-        <div class="container-narrow">
-            <div>
-                <h3 class="muted">SensorNode [last 48h]</h3>
-                <b>Left axis</b><br />
-                
-                <?php
-                    // Show errors
-                    ini_set('display_errors', 1);
-    
-                    // Includes
-                    include_once '../config/database.php';
-                    
-                    // Connect to database
-                    $database = new Database();
-                    $db = $database->getConnection();
-                    
-                    // Query database
-                    $query = sprintf("SELECT * FROM quantities");
-                    $result = $db->query($query);
-                    
-                    // Query database
-                    //$query = sprintf("SELECT sensors.id, sensors.name, quantities.uom FROM sensors LEFT JOIN quantities ON sensors.quantity_id = quantities.id WHERE user_id = 1 ORDER BY name ASC");
-                    $query = "SELECT DISTINCT quantities.id,  quantities.name, quantities.uom FROM sensors LEFT JOIN quantities ON sensors.quantity_id = quantities.id";
-                    $result = $db->query($query);
-                    
-                    // Populate dropdown
-                    echo "<select id='LeftAxisDropdown' onchange='updateLeftMultiDrop()' style='border-width:0px'>";
-                    while ($row = $result->fetch_assoc()) {
-                        if ($row['id']==3)
-                        {
-                            echo "<option value='" . $row['id'] . "' selected='selected'>" . $row['name'] . " [" . $row['uom'] . "]</option>";
-                        } else {
-                            echo "<option value='" . $row['id'] . "'>" . $row['name'] . " [" . $row['uom'] . "]</option>";
-                        }
-                    }
-                    echo "</select>";
-                    
-                    // Free memory associated with result
-                    $result->free();
-                    
-                    // Close connection
-                    $db->close();
-                ?>
-                <select id="LeftAxisMultiDropdown" multiple="multiple" onchange='updateGraph()'></select>
-                </select>
-                <br />
-                
-                <b>Right axis</b><br />
-                <?php
-                    // Show errors
-                    ini_set('display_errors', 1);
-    
-                    // Includes
-                    include_once '../config/database.php';
-                    
-                    // Connect to database
-                    $database = new Database();
-                    $db = $database->getConnection();
-                    
-                    // Query database
-                    $query = "SELECT DISTINCT quantities.id, quantities.name, quantities.uom FROM sensors LEFT JOIN quantities ON sensors.quantity_id = quantities.id";
-                    $result = $db->query($query);
-                    
-                    // Populate dropdown
-                    echo "<select id='RightAxisDropdown' onchange='updateRightMultiDrop()' style='border-width:0px'>";
-                    while ($row = $result->fetch_assoc()) {
-                        if ($row['id']==4)
-                        {
-                            echo "<option value='" . $row['id'] . "' selected='selected'>" . $row['name'] . " [" . $row['uom'] . "]</option>";
-                        } else {
-                            echo "<option value='" . $row['id'] . "'>" . $row['name'] . " [" . $row['uom'] . "]</option>";
-                        }
-                    }
-                    echo "</select>";
-                    
-                    // Free memory associated with result
-                    $result->free();
-                    
-                    // Close connection
-                    $db->close();
-                ?>                
-                <select id="RightAxisMultiDropdown" multiple="multiple" onchange='updateGraph()'>
-                </select>
-                <br /><br />                
-                
-                <div id="graph-container">
-                    <canvas id="graph-canvas" width="700"></canvas>
-                </div>
-            </div>
-    
-            <hr>
-    
-            <div class="footer">
-                <p>&copy; Joost Verberk 2018</p>
-            </div>
-        </div> <!-- /container -->
+<?php
+    // Show errors
+    ini_set('display_errors', 1);
 
-		<!-- javascript -->
-		<script type="text/javascript" src="js/jquery.min.js"></script>
-		<script type="text/javascript" src="js/moment.min.js"></script>
-		<script type="text/javascript" src="js/bootstrap.bundle.min.js"></script>
-		<script type="text/javascript" src="js/bootstrap-multiselect.js"></script>
-		<script type="text/javascript" src="js/chart.min.js"></script>
-		<script type="text/javascript" src="js/app.js"></script>
+   include_once '../config/database.php';
+   session_start();
+   
+   if($_SERVER["REQUEST_METHOD"] == "POST") {
+      // username and password sent from form 
+      
+      // Connect to database
+      $database = new Database();
+      $db = $database->getConnection();
+      
+      $myusername = mysqli_real_escape_string($db,$_POST['username']);
+      $mypassword = mysqli_real_escape_string($db,$_POST['password']); 
+      
+      $query = "SELECT id FROM users WHERE name = '$myusername' and pass = '$mypassword'";
+      $result = $db->query($query);
+      $row = $result->fetch_assoc();
 
-        <script type="text/javascript">
-            function updateLeftMultiDrop() {
-                $.ajax({
-                    url: "http://www.joostverberk.nl/api/graph/sensors.php",
-                    dataType:'json',
-                    method: "POST",
-                    data: {quantity_id: $('#LeftAxisDropdown').val()},
-                    success: function(data) {
-                        $('#LeftAxisMultiDropdown').empty();
-                        for (var i in data) {
-                            var option = document.createElement("option");
-                            option.text = data[i].name;
-                            option.value = data[i].id;
-                            $('#LeftAxisMultiDropdown').append(option);
-                            $('#LeftAxisMultiDropdown').multiselect('rebuild');
-                        }
-                    },
-                    error: function(response){
-                        console.log(response);
-                    }
-                });
-            }
-            
-            function updateRightMultiDrop() {
-                $.ajax({
-                    url: "http://www.joostverberk.nl/api/graph/sensors.php",
-                    dataType:'json',
-                    method: "POST",
-                    data: {quantity_id: $('#RightAxisDropdown').val()},
-                    success: function(data) {
-                        $('#RightAxisMultiDropdown').empty();
-                        for (var i in data) {
-                            var option = document.createElement("option");
-                            option.text = data[i].name;
-                            option.value = data[i].id;
-                            $('#RightAxisMultiDropdown').append(option);
-                            $('#RightAxisMultiDropdown').multiselect('rebuild');
-                        }
-                    },
-                    error: function(response){
-                        console.log(response);
-                    }
-                });
-            }
-        
-            function updateGraph() {
-              var left_axis = $('#LeftAxisMultiDropdown').val();
-              var right_axis = $('#RightAxisMultiDropdown').val();
-              $('#graph-canvas').remove(); // this is my <canvas> element
-              $('#graph-container').append('<canvas id="graph-canvas"><canvas>');
-              renderChart(left_axis,right_axis);
-            }
-        </script>
-	</body>
+      if($row) {    
+        $_SESSION["user_id"] = $row["id"];
+        header("location: graph.php");
+      } else {
+         $error = "Your username or password is invalid";
+      }
+    }
+?>
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="Mark Otto, Jacob Thornton, and Bootstrap contributors">
+    <meta name="generator" content="Jekyll v3.8.5">
+    <title>SensorNode - Login</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+
+
+    <style>
+      .bd-placeholder-img {
+        font-size: 1.125rem;
+        text-anchor: middle;
+      }
+
+      @media (min-width: 768px) {
+        .bd-placeholder-img-lg {
+          font-size: 3.5rem;
+        }
+      }
+    </style>
+    <!-- Custom styles for this template -->
+    <link href="css/signin.css" rel="stylesheet">
+  </head>
+  <body class="text-center">
+    <form class="form-signin" action="" method="post">
+      <h1 class="h3 mb-3 font-weight-normal">Please sign in</h1>
+      <label for="username" class="sr-only">User name</label>
+      <input type="text" name="username" class="form-control" placeholder="User name" required autofocus>
+      <label for="password" class="sr-only">Password</label>
+      <input type="password" name="password" class="form-control" placeholder="Password" required>
+      <div style = "color:#cc0000; margin-top:10px; margin-bottom:10px"><?php echo $error; ?></div>
+      <div class="checkbox mb-3">
+        <label>
+          <input type="checkbox" value="remember-me"> Remember me
+        </label>
+      </div>
+      <button class="btn btn-lg btn-primary btn-block" type="submit">Sign in</button>
+      <p class="mt-5 mb-3 text-muted">&copy; Joost Verberk 2018</p>
+    </form>
+</body>
 </html>

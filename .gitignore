@@ -17,3 +17,4 @@ python/pushover-test/
 arduino/JSONLibrary/json_library/json_library.ino
 test.py
 php/api/config/
+arduino/ReadNUID/ReadNUID.ino

@@ -14,7 +14,7 @@ $database = new Database();
 $db = $database->getConnection();
 
 // Query database
-$query = "SELECT id, name FROM sensors WHERE quantity_id = " . $_POST["quantity_id"];
+$query = "SELECT id, name FROM sensors WHERE user_id = " . $_POST['user_id'] . " AND quantity_id = " . $_POST["quantity_id"];
 $result = $db->query($query);
 
 // Loop through the returned data

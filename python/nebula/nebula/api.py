@@ -15,7 +15,7 @@ class Client:
         return r['records']
 
     def add_single(self, sensor_id, value, post=False):
-        self.payload['values'].append({'sensor_id': sensor_id, 'value': '%.2f' % float(value())})
+        self.payload['values'].append({'sensor_id': sensor_id, 'value': '%.2f' % float(value)})
         if post:
             self.post_payload()
 
