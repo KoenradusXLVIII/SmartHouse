@@ -295,7 +295,7 @@ class SunspecClient(object):
 # A quick test runner
 #------------------------------------------------------------
 if __name__ == "__main__":
-    client = create_sunspec_sync_client("YOUR.HOST.GOES.HERE")
+    client = create_sunspec_sync_client("192.168.1.47")
 
     # print out all the device common block
     common = client.get_common_block()
