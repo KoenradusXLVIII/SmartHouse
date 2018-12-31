@@ -28,3 +28,4 @@ def lights_out(log_client):
         log_client.info('Switching lights off in %d seconds!' % delay)
         time.sleep(delay)
         hue_client.set_all_off()
+        log_client.info('Lights off!')

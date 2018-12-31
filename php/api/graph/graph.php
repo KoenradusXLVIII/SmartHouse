@@ -54,6 +54,7 @@
             .multiselect-container > li > a > label.checkbox
             {
                 width: 350px;
+                padding: 3px 20px 3px 10px;
             }
             .btn-group > .btn:first-child
             {
@@ -83,18 +84,13 @@
                     $result = $db->query($query);
                     
                     // Query database
-                    $query = "SELECT DISTINCT quantities.id,  quantities.name, quantities.uom FROM sensors LEFT JOIN quantities ON sensors.quantity_id = quantities.id";
+                    $query = "SELECT DISTINCT quantities.id,  quantities.name, quantities.uom FROM sensors LEFT JOIN quantities ON sensors.quantity_id = quantities.id WHERE user_id = " . $_SESSION['user_id'];
                     $result = $db->query($query);
                     
                     // Populate dropdown
                     echo "<select id='LeftAxisDropdown' onchange='updateLeftMultiDrop()' style='border-width:0px'>";
                     while ($row = $result->fetch_assoc()) {
-                        if ($row['id']==3)
-                        {
-                            echo "<option value='" . $row['id'] . "' selected='selected'>" . $row['name'] . " [" . $row['uom'] . "]</option>";
-                        } else {
-                            echo "<option value='" . $row['id'] . "'>" . $row['name'] . " [" . $row['uom'] . "]</option>";
-                        }
+                        echo "<option value='" . $row['id'] . "'>" . $row['name'] . " [" . $row['uom'] . "]</option>";
                     }
                     echo "</select>";
                     
@@ -121,18 +117,13 @@
                     $db = $database->getConnection();
                     
                     // Query database
-                    $query = "SELECT DISTINCT quantities.id, quantities.name, quantities.uom FROM sensors LEFT JOIN quantities ON sensors.quantity_id = quantities.id";
+                    $query = "SELECT DISTINCT quantities.id,  quantities.name, quantities.uom FROM sensors LEFT JOIN quantities ON sensors.quantity_id = quantities.id WHERE user_id = " . $_SESSION['user_id'];
                     $result = $db->query($query);
                     
                     // Populate dropdown
                     echo "<select id='RightAxisDropdown' onchange='updateRightMultiDrop()' style='border-width:0px'>";
                     while ($row = $result->fetch_assoc()) {
-                        if ($row['id']==4)
-                        {
-                            echo "<option value='" . $row['id'] . "' selected='selected'>" . $row['name'] . " [" . $row['uom'] . "]</option>";
-                        } else {
-                            echo "<option value='" . $row['id'] . "'>" . $row['name'] . " [" . $row['uom'] . "]</option>";
-                        }
+                        echo "<option value='" . $row['id'] . "'>" . $row['name'] . " [" . $row['uom'] . "]</option>";
                     }
                     echo "</select>";
                     
@@ -151,8 +142,6 @@
                 </div>
             </div>
     
-            <hr>
-    
             <div class="footer">
                 <p>&copy; Joost Verberk 2018 <a href="logout.php">[Log out]</a></p>
             </div>
@@ -170,8 +159,10 @@
         <script type="text/javascript">
             $(document).ready(function(){
             	$('#LeftAxisMultiDropdown').multiselect('rebuild');
+            	updateLeftMultiDrop();
             	$('#RightAxisMultiDropdown').multiselect('rebuild');
-            	renderChart([3],[5,6]);
+            	updateRightMultiDrop();
+            	renderChart([],[]);
             });
         
             function updateLeftMultiDrop() {
@@ -225,6 +216,14 @@
               $('#graph-container').append('<canvas id="graph-canvas"><canvas>');
               renderChart(left_axis,right_axis);
             }
+            
+            setInterval(function() {
+                var left_axis = $('#LeftAxisMultiDropdown').val();
+                var right_axis = $('#RightAxisMultiDropdown').val();                
+                $('#graph-canvas').remove(); // this is my <canvas> element
+                $('#graph-container').append('<canvas id="graph-canvas"><canvas>');
+                renderChart(left_axis,right_axis);    
+            }, 300 * 1000); // x * ms
         </script>
 	</body>
 </html>

@@ -5,6 +5,9 @@ ini_set('display_errors', 1);
 // Includes
 include_once '../config/database.php';
 
+// Parameters
+$interval = 5;
+
 // Connect to database
 $database = new Database();
 $db = $database->getConnection();
@@ -28,8 +31,28 @@ if (!empty($row)) {
         $row = $result->fetch_assoc();
         if(!empty($row)) {
             // User is allowed to upload data to this sensor
-            $query = "INSERT INTO meas (`sensor_id`, `value`) VALUES ('" . $item->sensor_id . "', '" . $item->value . "')";
+            
+            // Get the current 5-minute upload interval
+            $start_date = new DateTime();
+            $seconds = $start_date->format('s');
+            $start_date->modify('-' . $seconds . ' seconds');
+            $minute = $start_date->format('i');
+            $start_date->modify('-' . ($minute % $interval) . ' minutes');
+            $end_date = clone $start_date;
+            $end_date->modify('+5 minutes');
+            
+            $query = "SELECT * FROM meas WHERE sensor_id = " . $item->sensor_id . " AND timestamp >= '" . $start_date->format('Y-m-d H:i:s') . "' AND timestamp < '" . $end_date->format('Y-m-d H:i:s') . "' LIMIT 1";
             $result = $db->query($query);
+            $row = $result->fetch_assoc();
+            if(empty($row)) {
+                // First upload for this 5-minute time interval, write new value
+                $query = "INSERT INTO meas (`timestamp`, `sensor_id`, `value`) VALUES ('" . $start_date->format('Y-m-d H:i:s') . "', '" . $item->sensor_id . "', '" . $item->value . "')";
+                $result = $db->query($query);
+            } else {
+                // Not first upload for this 5-minute time interval, update previous value
+                $query = "UPDATE meas SET `value` = '" . $item->value . "' WHERE `id` = '" . $row['id'] . "'";
+                $result = $db->query($query);
+            }
         }
     }
 }
