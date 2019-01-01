@@ -21,7 +21,7 @@
 
       if($row) {    
         $_SESSION["user_id"] = $row["id"];
-        header("location: graph.php");
+        header("location: intraday.php");
       } else {
          $error = "Your username or password is invalid";
       }

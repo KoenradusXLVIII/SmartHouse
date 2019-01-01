@@ -26,7 +26,8 @@ if (!empty($row)) {
     // Upload each measurement in the payload
     $list = $data->values;
     foreach($list as $item) {
-        $query = "SELECT name FROM sensors WHERE id = " . $item->sensor_id . " AND user_id=" . $user_id;    
+        $query = "SELECT sensors.name FROM sensors LEFT JOIN nodes ON sensors.node_id = nodes.id WHERE sensors.id = " . $item->sensor_id . " AND nodes.user_id='" . $user_id . "'";    
+        echo $query;
         $result = $db->query($query);
         $row = $result->fetch_assoc();
         if(!empty($row)) {

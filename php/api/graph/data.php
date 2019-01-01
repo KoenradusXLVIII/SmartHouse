@@ -14,7 +14,9 @@ $database = new Database();
 $db = $database->getConnection();
 
 // Query database
-$query = "SELECT meas.sensor_id, meas.timestamp, meas.value, sensors.name AS sensor_name, quantities.name AS quantity_name, quantities.uom FROM meas LEFT JOIN sensors ON meas.sensor_id = sensors.id LEFT JOIN quantities ON sensors.quantity_id = quantities.id WHERE meas.sensor_id IN (";
+$query = "SELECT meas.sensor_id, meas.timestamp, meas.value, sensors.name AS sensor_name, quantities.name AS quantity_name, quantities.uom FROM meas ";
+$query = $query . "LEFT JOIN sensors ON meas.sensor_id = sensors.id LEFT JOIN quantities ON sensors.quantity_id = quantities.id ";
+$query = $query . "WHERE DATE(timestamp) = '" . $_POST["graph_date"] . "' AND meas.sensor_id IN (";
 foreach ($_POST["sensors"] as $sensor) {
     $query = $query . $sensor . ",";
 }

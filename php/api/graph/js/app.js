@@ -1,10 +1,10 @@
-function renderChart(left_axis, right_axis) {
+function renderChart(left_axis, right_axis, graph_date) {
     //var jsonSensors = JSON.stringify(sensor_ids);
     $.ajax({
     	url: "http://www.joostverberk.nl/api/graph/data.php",
     	dataType:'json',
     	method: "POST",
-    	data: {sensors: left_axis.concat(right_axis)},
+    	data: {sensors: left_axis.concat(right_axis), graph_date: graph_date},
     	success: function(data) {
             // Set colour sets
             var colorset = ["#003f5c","#7a5195","#ef5675","#ffa600"];
@@ -146,6 +146,7 @@ function renderChart(left_axis, right_axis) {
     	},
     	error: function(response){
             console.log(response);
+            console.log(graph_date);
          }
     });
 }
