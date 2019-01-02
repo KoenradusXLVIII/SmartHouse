@@ -17,59 +17,60 @@
         </style>
 	</head>
 	<body>
-	    <div class="row">
-    	    <div class="col-md-3"></div>
-    	    <div class="col-md-7">
-                <h2>Sensors</h2>
-                [<a href="intraday.php">Intraday</a>] [<a href="nodes.php">Nodes</a>] [<a href="sensor_table.php">Sensors</a>]<br /><br />
-                <div class="table-responsive">
-                    <table id="sensors" class="table table-striped table-bordered">
-                      <thead>
-                        <tr>
-                          <th>Node</th>
-                          <th>Name</th>
-                          <th>Quantity</th>
-                          <th>Last value</th>
-                          <th>Last update</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                          <?php
-                            // Includes
-                            include_once '../config/database.php';
-                            
-                            // Connect to database
-                            $database = new Database();
-                            $db = $database->getConnection();
-                            
-                            // Query database
-                            $query = "SELECT sensors.id FROM sensors LEFT JOIN nodes ON sensors.node_id = nodes.id WHERE user_id = '" . $_SESSION['user_id'] . "' ORDER BY sensors.name ASC";
-                            $result = $db->query($query);
-                            
-                            // Loop through the returned data
-                            $data = array();
-                            if($result) {
-                                foreach ($result as $row) {
-    	                            // Query database
-                                    $query = "SELECT nodes.name AS node, sensors.name AS sensor, quantities.name AS quantity, quantities.uom, meas.timestamp, meas.value FROM nodes LEFT JOIN sensors ON sensors.node_id = nodes.id LEFT JOIN meas ON meas.sensor_id = sensors.id LEFT JOIN quantities ON sensors.quantity_id = quantities.id WHERE sensors.id = '" . $row['id'] . "' AND user_id = '" . $_SESSION['user_id'] ."' ORDER BY timestamp DESC LIMIT 1";
-                                    $result = $db->query($query);
-                                    $line = $result->fetch_assoc();
-                                    
-                                    echo "<tr>";
-                                    echo "<td>" . $line['node']  . "</td>";
-                                    echo "<td>" . $line['sensor']  . "</td>";
-                                    echo "<td>" . $line['quantity'] . "</td>";
-                                    echo "<td>" . $line['value']  . " " . $line['uom'] . "</td>";
-                                    echo "<td>" . $line['timestamp']  . "</td>";
-                                    echo "</tr>";
+	    <div class="container">
+            <div class="row">
+        	    <div class="col-md-10">
+                    <h2>Sensors</h2>
+                    [<a href="intraday.php">Intraday</a>] [<a href="nodes.php">Nodes</a>] [<a href="sensor_table.php">Sensors</a>]<br /><br />
+                    <div class="table-responsive">
+                        <table id="sensors" class="table table-striped table-bordered">
+                          <thead>
+                            <tr>
+                              <th>Node</th>
+                              <th>Name</th>
+                              <th>Quantity</th>
+                              <th>Last value</th>
+                              <th>Last update</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                              <?php
+                                // Includes
+                                include_once '../config/database.php';
+                                
+                                // Connect to database
+                                $database = new Database();
+                                $db = $database->getConnection();
+                                
+                                // Query database
+                                $query = "SELECT sensors.id FROM sensors LEFT JOIN nodes ON sensors.node_id = nodes.id WHERE user_id = '" . $_SESSION['user_id'] . "' ORDER BY sensors.name ASC";
+                                $result = $db->query($query);
+                                
+                                // Loop through the returned data
+                                $data = array();
+                                if($result) {
+                                    foreach ($result as $row) {
+        	                            // Query database
+                                        $query = "SELECT nodes.name AS node, sensors.name AS sensor, quantities.name AS quantity, quantities.uom, meas.timestamp, meas.value FROM nodes LEFT JOIN sensors ON sensors.node_id = nodes.id LEFT JOIN meas ON meas.sensor_id = sensors.id LEFT JOIN quantities ON sensors.quantity_id = quantities.id WHERE sensors.id = '" . $row['id'] . "' AND user_id = '" . $_SESSION['user_id'] ."' ORDER BY timestamp DESC LIMIT 1";
+                                        $result = $db->query($query);
+                                        $line = $result->fetch_assoc();
+                                        
+                                        echo "<tr>";
+                                        echo "<td>" . $line['node']  . "</td>";
+                                        echo "<td>" . $line['sensor']  . "</td>";
+                                        echo "<td>" . $line['quantity'] . "</td>";
+                                        echo "<td>" . $line['value']  . " " . $line['uom'] . "</td>";
+                                        echo "<td>" . $line['timestamp']  . "</td>";
+                                        echo "</tr>";
+                                    }
                                 }
-                            }
-                          ?>
-                      </tbody>
-                    </table>
-                </div>
-                <div class="footer">
-                    <p>&copy; SensorNode - Joost Verberk - 2018 <a href="logout.php">[Log out]</a></p>
+                              ?>
+                          </tbody>
+                        </table>
+                    </div>
+                    <div class="footer">
+                        <p>&copy; SensorNode - Joost Verberk - 2018 <a href="logout.php">[Log out]</a></p>
+                    </div>
                 </div>
             </div>
         </div>

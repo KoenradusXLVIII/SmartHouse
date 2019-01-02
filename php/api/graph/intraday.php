@@ -29,105 +29,114 @@
         </style>
 	</head>
 	<body>
-        <div class="row">
-    	    <div class="col-md-3"></div>
-    	    <div class="col-md-5">
-                <h2>Intraday</h2>
-                [<a href="intraday.php">Intraday</a>] [<a href="nodes.php">Nodes</a>] [<a href="sensor_table.php">Sensors</a>]<br /><br />
-                <b>Left axis</b><br />
-                
-                <?php
-                    // Show errors
-                    ini_set('display_errors', 1);
+	    <div class="container">
+            <div class="row">
+        	    <div class="col-md-10">
+                    <h2>Intraday</h2>
+                    [<a href="intraday.php">Intraday</a>] [<a href="nodes.php">Nodes</a>] [<a href="sensor_table.php">Sensors</a>]<br /><br />
+                    <b>Personal views</b><br />
+                    <select id='ViewDropdown' onchange='viewChange()' style='border-width:0px'>
+                    </select>&nbsp;&nbsp;
+                    <button onclick="viewDelete()">Delete</button>&nbsp;&nbsp;
+                    <button onclick="viewFav()">Set as favourite</button>&nbsp;&nbsp;
+                    <button onclick="viewStore()">Store</button>&nbsp;&nbsp;
+                    <input type="text" id="viewName" placeholder="Unique view name">&nbsp;&nbsp;<span id="viewStoreStatus"></span>
+                    <br /><br />
+                    
+                    <b>Left axis</b><br />
+                    
+                    <?php
+                        // Show errors
+                        ini_set('display_errors', 1);
+        
+                        // Includes
+                        include_once '../config/database.php';
+                        
+                        // Connect to database
+                        $database = new Database();
+                        $db = $database->getConnection();
+                        
+                        // Query database
+                        $query = sprintf("SELECT * FROM quantities");
+                        $result = $db->query($query);
+                        
+                        // Query database
+                        $query = "SELECT DISTINCT quantities.id,  quantities.name, quantities.uom FROM sensors LEFT JOIN quantities ON sensors.quantity_id = quantities.id LEFT JOIN nodes ON sensors.node_id = nodes.id WHERE nodes.user_id = '" . $_SESSION['user_id'] ."'";
+                        $result = $db->query($query);
+                        
+                        // Populate dropdown
+                        echo "<select id='LeftAxisDropdown' onchange='updateLeftMultiDrop()' style='border-width:0px'>";
+                        while ($row = $result->fetch_assoc()) {
+                            echo "<option value='" . $row['id'] . "'>" . $row['name'] . " [" . $row['uom'] . "]</option>";
+                        }
+                        echo "</select>";
+                        
+                        // Free memory associated with result
+                        $result->free();
+                        
+                        // Close connection
+                        $db->close();
+                    ?>
+                    <select id="LeftAxisMultiDropdown" multiple="multiple" onchange='updateGraph()'></select>
+                    </select>
+                    <br />
+                    
+                    <b>Right axis</b><br />
+                    <?php
+                        // Show errors
+                        ini_set('display_errors', 1);
+        
+                        // Includes
+                        include_once '../config/database.php';
+                        
+                        // Connect to database
+                        $database = new Database();
+                        $db = $database->getConnection();
+                        
+                        // Query database
+                        $query = "SELECT DISTINCT quantities.id,  quantities.name, quantities.uom FROM sensors LEFT JOIN quantities ON sensors.quantity_id = quantities.id LEFT JOIN nodes ON sensors.node_id = nodes.id WHERE nodes.user_id = '" . $_SESSION['user_id'] . "'";
+                        $result = $db->query($query);
+                        
+                        // Populate dropdown
+                        echo "<select id='RightAxisDropdown' onchange='updateRightMultiDrop()' style='border-width:0px'>";
+                        while ($row = $result->fetch_assoc()) {
+                            echo "<option value='" . $row['id'] . "'>" . $row['name'] . " [" . $row['uom'] . "]</option>";
+                        }
+                        echo "</select>";
+                        
+                        // Free memory associated with result
+                        $result->free();
+                        
+                        // Close connection
+                        $db->close();
+                    ?>                
+                    <select id="RightAxisMultiDropdown" multiple="multiple" onchange='updateGraph()'>
+                    </select>
+                    <br />  
+                    <b>Date</b><br/>
     
-                    // Includes
-                    include_once '../config/database.php';
-                    
-                    // Connect to database
-                    $database = new Database();
-                    $db = $database->getConnection();
-                    
-                    // Query database
-                    $query = sprintf("SELECT * FROM quantities");
-                    $result = $db->query($query);
-                    
-                    // Query database
-                    $query = "SELECT DISTINCT quantities.id,  quantities.name, quantities.uom FROM sensors LEFT JOIN quantities ON sensors.quantity_id = quantities.id LEFT JOIN nodes ON sensors.node_id = nodes.id WHERE nodes.user_id = '" . $_SESSION['user_id'] ."'";
-                    $result = $db->query($query);
-                    
-                    // Populate dropdown
-                    echo "<select id='LeftAxisDropdown' onchange='updateLeftMultiDrop()' style='border-width:0px'>";
-                    while ($row = $result->fetch_assoc()) {
-                        echo "<option value='" . $row['id'] . "'>" . $row['name'] . " [" . $row['uom'] . "]</option>";
-                    }
-                    echo "</select>";
-                    
-                    // Free memory associated with result
-                    $result->free();
-                    
-                    // Close connection
-                    $db->close();
-                ?>
-                <select id="LeftAxisMultiDropdown" multiple="multiple" onchange='updateGraph()'></select>
-                </select>
-                <br />
-                
-                <b>Right axis</b><br />
-                <?php
-                    // Show errors
-                    ini_set('display_errors', 1);
-    
-                    // Includes
-                    include_once '../config/database.php';
-                    
-                    // Connect to database
-                    $database = new Database();
-                    $db = $database->getConnection();
-                    
-                    // Query database
-                    $query = "SELECT DISTINCT quantities.id,  quantities.name, quantities.uom FROM sensors LEFT JOIN quantities ON sensors.quantity_id = quantities.id LEFT JOIN nodes ON sensors.node_id = nodes.id WHERE nodes.user_id = '" . $_SESSION['user_id'] . "'";
-                    $result = $db->query($query);
-                    
-                    // Populate dropdown
-                    echo "<select id='RightAxisDropdown' onchange='updateRightMultiDrop()' style='border-width:0px'>";
-                    while ($row = $result->fetch_assoc()) {
-                        echo "<option value='" . $row['id'] . "'>" . $row['name'] . " [" . $row['uom'] . "]</option>";
-                    }
-                    echo "</select>";
-                    
-                    // Free memory associated with result
-                    $result->free();
-                    
-                    // Close connection
-                    $db->close();
-                ?>                
-                <select id="RightAxisMultiDropdown" multiple="multiple" onchange='updateGraph()'>
-                </select>
-                <br />  
-                <b>Date</b><br/>
-
-                <div class="form-group">
-                    <div class='input-group date' id='datepicker1' data-target-input='nearest'>
-                        <input id="datepicker" type='text' class="form-control datepicker-input" data-target="#datepicker1" value="<?php echo date("d-m-Y"); ?>">
-                        <div class="input-group-append" data-target="#datepicker" data-toggle="datepicker">
-                            <div class="input-group-text">
-                                <i class="fa fa-calendar"></i>
+                    <div class="form-group">
+                        <div class='input-group date' id='datepicker1' data-target-input='nearest'>
+                            <input id="datepicker" type='text' class="form-control datepicker-input" data-target="#datepicker1" value="<?php echo date("d-m-Y"); ?>">
+                            <div class="input-group-append" data-target="#datepicker" data-toggle="datepicker">
+                                <div class="input-group-text">
+                                    <i class="fa fa-calendar"></i>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-                
-                <br /><br />
-                
-                <div id="graph-container">
-                    <canvas id="graph-canvas" width="400"></canvas>
-                </div> 
-                <br />
-                <div class="footer">
-                    <p>&copy; SensorNode - Joost Verberk - 2018 <a href="logout.php">[Log out]</a></p>
+                    
+                    <br />
+                    
+                    <div id="graph-container">
+                        <canvas id="graph-canvas" width="400"></canvas>
+                    </div> 
+                    <br />
+                    <div class="footer">
+                        <p>&copy; SensorNode - Joost Verberk - 2018 <a href="logout.php">[Log out]</a></p>
+                    </div>
                 </div>
             </div>
-            <div class="col-md-3"></div>
         </div>
     
         
@@ -152,12 +161,111 @@
             	updateLeftMultiDrop();
             	$('#RightAxisMultiDropdown').multiselect('rebuild');
             	updateRightMultiDrop();
-            	renderChart([],[]);
+            	viewDropdownUpdate();
+            	setTimeout(viewChange,1000);
             });
             
             $('#datepicker').on('changeDate', function() {
                 updateGraph();    
             });
+            
+            function viewDelete() {
+                var view_id = $('#ViewDropdown').val();
+                $.ajax({
+                    url: "http://www.joostverberk.nl/api/graph/views/views.php",
+                    dataType:'json',
+                    method: "POST",
+                    data: {method: "DEL", view_id: view_id, user_id: '<?php echo $_SESSION['user_id'];?>'},
+                    success: function(data) {
+                        viewDropdownUpdate();  
+                        setTimeout(viewChange,1000);
+                    },
+                    error: function(response){
+                        console.log(response);
+                    }
+                });                
+            }
+            
+            function viewDropdownUpdate() {
+                $.ajax({
+                    url: "http://www.joostverberk.nl/api/graph/views/views.php",
+                    dataType:'json',
+                    method: "POST",
+                    data: {method: "ALL", user_id: '<?php echo $_SESSION['user_id'];?>'},
+                    success: function(data) {  
+                        $('#ViewDropdown').empty();
+                        for (var i in data) {
+                            var option = document.createElement("option");
+                            option.text = data[i].name;
+                            option.value = data[i].id;
+                            $('#ViewDropdown').append(option);
+                        }    
+                    },
+                    error: function(response){
+                        console.log(response);
+                    }
+                });
+            }
+            
+            function viewChange() {
+                var view_id = $('#ViewDropdown').val();
+                $.ajax({
+                    url: "http://www.joostverberk.nl/api/graph/views/views.php",
+                    dataType:'json',
+                    method: "POST",
+                    data: {method: "GET_VIEW", view_id: view_id, user_id: '<?php echo $_SESSION['user_id'];?>'},
+                    success: function(data) {
+                        $('#graph-canvas').remove(); // this is my <canvas> element
+                        $('#graph-container').append('<canvas id="graph-canvas"><canvas>');
+                        var graph_date = $('#datepicker').data('datepicker').getFormattedDate('yyyy-mm-dd');
+                        renderChart(data.left_axis,data.right_axis,graph_date);    
+                    },
+                    error: function(response){
+                        console.log(response);
+                    }
+                });    
+            }
+            
+            function viewStore() {
+                var view_name = $('#viewName').val();
+                if (view_name) {
+                    // viewName cannot be empty
+                    // now check if viewName is unique
+                    $.ajax({
+                        url: "http://www.joostverberk.nl/api/graph/views/views.php",
+                        dataType:'json',
+                        method: "POST",
+                        data: {method: "GET_NAME", view_name: view_name, user_id: '<?php echo $_SESSION['user_id'];?>'},
+                        success: function(data) {
+                            if(data.length==0) {
+                                // viewName must be unique
+                                var left_axis = $('#LeftAxisMultiDropdown').val();
+                                var right_axis = $('#RightAxisMultiDropdown').val();
+                                $.ajax({
+                                    url: "http://www.joostverberk.nl/api/graph/views/views.php",
+                                    dataType:'json',
+                                    method: "POST",
+                                    data: {method: "POST", view_name: view_name, left_axis: left_axis, right_axis: right_axis, user_id: '<?php echo $_SESSION['user_id'];?>'},
+                                    success: function(data) {
+                                        $('#viewStoreStatus').html('<span class="badge badge-success">OK</span>');
+                                        viewDropdownUpdate();
+                                    },
+                                    error: function(response){
+                                        console.log(response);
+                                    }
+                                });
+                            } else {
+                                $('#viewStoreStatus').html('<span class="badge badge-danger">name not unique</span>');
+                            }
+                        },
+                        error: function(response){
+                            console.log(response);
+                        }
+                    });
+                } else {
+                    $('#viewStoreStatus').html('<span class="badge badge-danger">name empty</span>');
+                }
+            }
         
             function updateLeftMultiDrop() {
                 $.ajax({
@@ -209,6 +317,7 @@
               $('#graph-canvas').remove(); // this is my <canvas> element
               $('#graph-container').append('<canvas id="graph-canvas"><canvas>');
               var graph_date = $('#datepicker').data('datepicker').getFormattedDate('yyyy-mm-dd');
+              console.log(left_axis,right_axis);
               renderChart(left_axis,right_axis,graph_date);
             }
             
