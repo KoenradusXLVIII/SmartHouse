@@ -1,3 +1,5 @@
+# Python3
+
 import re
 from PyCRC.CRC16 import CRC16
 import serial
@@ -69,7 +71,7 @@ class Client:
 
     def read_line(self):
         if self.ser.isOpen():
-            line = self.ser.readline()
+            line = self.ser.readline().decode('utf-8')
             if self.logger:
                 self.logger.debug('[P1]: %s' % line.strip())
             return str(line)

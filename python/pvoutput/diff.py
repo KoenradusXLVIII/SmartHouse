@@ -17,7 +17,7 @@ def diff(value, name):
     try:
         with open(filename, 'rb') as fp:
             prev_value = pickle.load(fp)
-    except IOError:
+    except FileNotFoundError:
         prev_value = 0
 
     # Compute difference
