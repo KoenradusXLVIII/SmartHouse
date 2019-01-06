@@ -22,15 +22,12 @@ def diff(value, name):
 
     # Compute difference
     diff_value = value - prev_value
-    if diff_value < 0:
-        # Catch unexpected negative difference
-        diff_value = 0
 
     # Write new data to data file
     with open(filename, 'wb') as fp:
         pickle.dump(value, fp)
 
-    # Return differenceW
+    # Return difference
     return diff_value
 
 

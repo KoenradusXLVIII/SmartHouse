@@ -1,5 +1,3 @@
-# Python3
-
 # Public packages
 import requests
 import datetime
@@ -19,11 +17,14 @@ from diff import diff
 # Check command line parameters
 local = False  # Upload to PVOutput
 verbose = False  # Verbose output
+debug = False # Debug output
 if len(sys.argv) > 1:
     if 'v' in sys.argv[1]:
         verbose = True
     if 'l' in sys.argv[1]:
         local = True
+    if 'd' in sys.argv[1]:
+        debug = True
 
 # Load configuration YAML
 path = os.path.dirname(os.path.realpath(__file__))
@@ -38,6 +39,8 @@ nebula_client = nebula.Client(**cfg['nebula'])
 
 # Set up Logger and attach Pushover client
 log_client = logger.Client(name='pvoutput')
+if debug:
+    log_client.set_log_level('debug')
 log_client.attach_pushover(pushover_client)
 log_client.attach_nebula(nebula_client)
 
@@ -47,7 +50,8 @@ arduino_mainhouse = arduino.Client(**cfg['arduino']['mainhouse'])
 
 # Set up P1 client
 p1_client = P1.Client('/dev/ttyUSB0')
-
+if debug:
+    p1_client.attach_logger(log_client)
 
 def main():
     # Get PV and Water data
@@ -111,14 +115,14 @@ def main():
         log_client.debug('PVOutput payload: %s' % payload)
 
     # Prepare Nebula payload
-    prod_energy = data_mainhouse['E_PV']                            # Solar Energy Production [Wh]
-    cons_energy = data_mainhouse['E_PV'] + p1_client.energy         # Local Energy Consumption [Wh]
-    prod_power = diff(prod_energy, 'prod_energy') * (60 / 5)        # 5 minute average Solar Energy Production [W]
-    cons_power = diff(prod_energy, 'prod_energy') * (60 / 5)        # 5-minute averaged Local Energy Consumption [W]
+    E_prod = data_mainhouse['E_PV']                                         # Solar Energy Production [Wh]
+    E_cons = data_mainhouse['E_PV'] + p1_client.energy                      # Local Energy Consumption [Wh]
+    P_prod = diff(E_prod, 'E_prod') * (60 / 5)                              # 5 minute average Solar Energy Production [W]
+    P_cons = diff(E_cons, 'E_cons') * (60 / 5)                              # 5-minute averaged Local Energy Consumption [W]
 
     payload = {
-        '6':  prod_power,                                                   # 5 min average Solar Energy Production [W]
-        '5':  cons_power,                                                   # 5-min average Local Energy Consumption [W]
+        '6':  P_prod,                                                       # 5 minute average Solar Energy Production [W]
+        '5':  P_cons,                                                       # 5-minute averaged Local Energy Consumption [W]
         '22': p1_client.energy / 1000.0,                                    # Net Energy Consumption [kWh]
         '23': psutil.cpu_percent(),                                         # Current system-wide CPU utilization [%]
         '25': psutil.virtual_memory().percent,                              # Current memory usage [%]

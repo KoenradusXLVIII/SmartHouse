@@ -147,9 +147,10 @@ class Client:
 
                 if line_no >= TELEGRAM_LENGTH:
                     if self.logger:
-                        self.logger.warning('Invalid telegram [serial number not found]')
+                        self.logger.info('Invalid telegram [serial number not found]')
                 else:
                     # Start of transmission detected
+                    self.logger.debug('Valid telegram [found after %d lines read]' % line_no)
                     self.new_telegram()
                     self.add_line_to_telegram(line)
 

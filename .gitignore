@@ -19,3 +19,4 @@ test.py
 php/api/config/
 arduino/ReadNUID/ReadNUID.ino
 *.ppk
+python/testvenv/
