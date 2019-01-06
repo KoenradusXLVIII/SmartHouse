@@ -7,12 +7,11 @@ import yaml
 import time
 import signal
 import sys
-from xml.etree import ElementTree as ET
+from xml.etree import ElementTree
 
 # Personal
 import nebula
 import pushover
-import logger
 import arduino
 import hue
 
@@ -21,20 +20,17 @@ fp = open('config.yaml', 'r')
 cfg = yaml.load(fp)
 
 # Set up Pushover client
-pushover_client = pushover.Client(cfg['pushover']['token'], cfg['pushover']['user'])
-
-# Set up logger client
-log_client = logger.Client(name='foscam', log_level='debug')
-log_client.attach_pushover(pushover_client)
-
-# Set up Guard House Arduino client
-arduino_client = arduino.Client(cfg['guardhouse']['ip'])
-
-# Set up Hue client
-hue_client = hue.Client(cfg['hue']['ip'])
+pushover_client = pushover.Client(**cfg['pushover'])
 
 # Set up Nebula API client
-nebula_client = nebula.Client(cfg['nebula']['url'],cfg['nebula']['key'])
+nebula_client = nebula.Client(**cfg['nebula'])
+nebula_client.set_level(nebula.DEBUG)
+
+# Set up Guard House Arduino client
+arduino_client = arduino.Client(**cfg['guardhouse'])
+
+# Set up Hue client
+hue_client = hue.Client(**cfg['hue'])
 
 
 def main():
@@ -44,7 +40,7 @@ def main():
     motor_light_state = 0
     motion_timer = 0
 
-    log_client.info('Foscam and Pushover monitoring scripts activated')
+    nebula_client.info('Foscam and Pushover monitoring scripts activated')
     while True:
         # Sleep for 5 seconds
         time.sleep(5)
@@ -58,15 +54,15 @@ def main():
             # Update Guard House API
             if arduino_client.set_value('day_night', infra_led_state):
                 if infra_led_state:  # night
-                    log_client.info('Transition to night written to Guard House API')
+                    nebula_client.info('Transition to night written to Guard House API')
                     # If no one home turns lights on in 'not home' mode
                     if hue_client.get_all_off():
                         hue_client.set_scene('Not home')
-                        log_client.info('Switching lights on to \'Not home\' mode')
+                        nebula_client.info('Switching lights on to \'Not home\' mode')
                 else:  # day
-                    log_client.info('Transition to day written to Guard House API')
+                    nebula_client.info('Transition to day written to Guard House API')
             else:
-                log_client.warning('Failed to write \'day_night\' to Guard House API')
+                nebula_client.warning('Failed to write \'day_night\' to Guard House API')
 
         last_infra_led_state = infra_led_state
 
@@ -75,10 +71,10 @@ def main():
         if (last_motion_state == cfg['foscam']['state']['no alarm']) and (
                 motion_detect == cfg['foscam']['state']['alarm']):
             # Log to Nebula
-            #nebula_client.post_single(29,motion_detect) TODO: needs 5 minute flattening
+            nebula_client.warning('Motion alert!')
 
             if (time.time() - motion_timer) > cfg['motor']['hysteresis']:
-                log_client.debug('New motion detected outside hysteresis interval, starting counter')
+                nebula_client.debug('New motion detected outside hysteresis interval, starting counter')
                 # Alarm handling
                 if arduino_client.get_value('alarm_mode'):
                     pushover_client.message('Alarm triggered!', snapshot(), 'GuardHouse Security', 'high', 'alien')
@@ -90,20 +86,13 @@ def main():
                         # ... it is off
                         motor_light_state = 1
                         if arduino_client.set_value('motor_light', motor_light_state):
-                            log_client.debug('Wrote \'HIGH\' to \'motor_light\' to the Guard House API')
+                            nebula_client.debug('Wrote \'HIGH\' to \'motor_light\' to the Guard House API')
                         else:
-                            log_client.warning('Failed to write \'motor_light\' to the Guard House API')
+                            nebula_client.warning('Failed to write \'motor_light\' to the Guard House API')
             else:
-                log_client.debug('Motion detected within hysteresis interval, resetting counter')
+                nebula_client.debug('Motion detected within hysteresis interval, resetting counter')
 
             motion_timer = time.time()
-
-        elif (last_motion_state == cfg['foscam']['state']['alarm']) and (
-                motion_detect == cfg['foscam']['state']['no alarm']):
-            pass
-            # Log to Nebula
-            #nebula_client.post_single(29, motion_detect) TODO: needs 5 minute flattening
-
         else:
             # Light handling
             if (time.time() - motion_timer) > cfg['motor']['hysteresis']:
@@ -112,9 +101,9 @@ def main():
                     # There is no motion detected and the light is on so we turn the light off
                     motor_light_state = 0
                     if arduino_client.set_value('motor_light', motor_light_state):
-                        log_client.debug('Wrote \'LOW\' to \'motor_light\' to the Guard House API')
+                        nebula_client.debug('Wrote \'LOW\' to \'motor_light\' to the Guard House API')
                     else:
-                        log_client.warning('Failed to write \'motor_light\' to the Guard House API')
+                        nebula_client.warning('Failed to write \'motor_light\' to the Guard House API')
 
         last_motion_state = motion_detect
 
@@ -124,10 +113,10 @@ def devstate():
     try:
         cgi_url = cfg['foscam']['motor']['url'] + cfg['foscam']['motor']['cgi']
         payload = {'usr': cfg['foscam']['motor']['user'], 'pwd': cfg['foscam']['motor']['pass'], 'cmd': 'getDevState'}
-        r = requests.get(cgi_url, params=payload)
-        return ET.fromstring(r.text)  # Extract XML tree
-    except:
-        log_client.warning('Unable to read device status [invalid response from Foscam API]')
+        r = requests.get(cgi_url, params=payload, timeout=1)
+        return ElementTree.fromstring(r.text)  # Extract XML tree
+    except ConnectionError:
+        nebula_client.warning('Unable to read device status [invalid response from Foscam API]')
         return None
 
 
@@ -137,17 +126,17 @@ def snapshot():
         cgi_url = cfg['foscam']['motor']['url'] + cfg['foscam']['motor']['cgi']
         payload = {'usr': cfg['foscam']['motor']['user'], 'pwd': cfg['foscam']['motor']['pass'], 'cmd': 'snapPicture'}
         r = requests.get(cgi_url, params=payload)
-        reg = re.search('(Snap_\d{8}-\d{6}.jpg)', r.text)  # Get snapshot name: Snap_YYYYMMDD_HHMMSS.jpg
+        reg = re.search(r'(Snap_\d{8}-\d{6}.jpg)', r.text)  # Get snapshot name: Snap_YYYYMMDD_HHMMSS.jpg
         snap_url = cfg['foscam']['motor']['url'] + 'snapPic/' + reg.group(1)
         r = requests.get(snap_url)
         return r.content
-    except:
-        log_client.warning('Unable to capture snapshot [invalid response from Foscam API]')
+    except ConnectionError:
+        nebula_client.warning('Unable to capture snapshot [invalid response from Foscam API]')
         return None
 
 
 def exit_gracefully(sig, frame):
-    log_client.info('Foscam and Pushover monitoring scripts de-activated.')
+    nebula_client.info('Foscam and Pushover monitoring scripts de-activated.')
     sys.exit()
 
 
