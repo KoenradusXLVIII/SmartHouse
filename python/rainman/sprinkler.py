@@ -1,35 +1,56 @@
-import requests
+# Python3
+
+# Public packages
 import sys
 from time import sleep
-import logger
+import yaml
 
-sprinkler_on = "http://192.168.1.112/water_mode/manual"
-sprinkler_off = "http://192.168.1.112/water_mode/auto"
+# Private packages
+import arduino
+import nebula
 
-# Set up logger
-log_client = logger.Client(name='sprinkler')
+ON = 0
+OFF = 1
 
-if(len(sys.argv) > 1):
-	if('off' in sys.argv[1]):
-		try:
-			requests.get(sprinkler_off)
-			log_client.info("Sprinklers manually disabled")
-		except:
-			log_client.error("Unable to connect to sprinkler system")
-			sys.exit()
-	else:
-		try:
-			sprinkler_duration = int(sys.argv[1]) # min
-			try:
-				requests.get(sprinkler_on)
-				log_client.info("Sprinklers enabled for %d minutes" % (sprinkler_duration))
-				sleep(sprinkler_duration*60)
-				requests.get(sprinkler_off)
-				log_client.info("Sprinklers disabled after %d minutes" % (sprinkler_duration))
-			except:
-				log_client.error("Unable to connect to sprinkler system")
-				sys.exit()
-		except TypeError:
-			log_client.warning("No integer sprinkler interval supplied")
+# Load configuration YAML
+fp = open('config.yaml', 'r')
+cfg = yaml.load(fp)
+
+# Set up Nebula API client
+nebula_client = nebula.Client(**cfg['nebula'])
+
+# Set up Guard House Arduino client
+arduino_client = arduino.Client(**cfg['guardhouse'])
+
+
+def is_int(s):
+    try:
+        int(s)
+        return True
+    except ValueError:
+        return False
+
+
+if len(sys.argv) > 1:
+    if 'off' in sys.argv[1]:
+        if arduino_client.set_value('water_mode', OFF):
+            nebula_client.info('Sprinklers manually disabled')
+        else:
+            nebula_client.critical('Unable to de-activate sprinklers!')
+    elif 'on' in sys.argv[1]:
+        if is_int(sys.argv[2]):
+            sprinkler_duration = int(sys.argv[2])
+            if arduino_client.set_value('water_mode', ON):
+                nebula_client.info('Sprinklers enabled for %d minutes' % sprinkler_duration)
+            else:
+                nebula_client.warning('Unable to activate sprinklers')
+            sleep(sprinkler_duration * 60)
+            if arduino_client.set_value('water_mode', OFF):
+                nebula_client.info(
+                    'Sprinklers disabled after %d minutes' % sprinkler_duration)
+            else:
+                nebula_client.critical('Unable to de-activate sprinklers!')
+    else:
+        nebula_client.critical('Invalid sprinkler arguments supplied')
 else:
-	log_client.warning("No sprinkler arguments supplied")
+    nebula_client.warning('No sprinkler arguments supplied')

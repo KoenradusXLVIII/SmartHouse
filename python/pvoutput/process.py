@@ -12,7 +12,7 @@ import logger
 import nebula
 import arduino
 import pushover
-from diff import diff # TODO
+from diff import diff
 
 # Check command line parameters
 local = False  # Upload to PVOutput
@@ -29,18 +29,19 @@ fp = open(path + '/config.yaml', 'r')
 cfg = yaml.load(fp)
 
 # Set up Pushover client
-pushover_client = pushover.Client(cfg['pushover']['token'], cfg['pushover']['user'])
+pushover_client = pushover.Client(**cfg['pushover'])
+
+# Set up Nebula API client
+nebula_client = nebula.Client(**cfg['nebula'])
 
 # Set up Logger and attach Pushover client
 log_client = logger.Client(name='pvoutput')
 log_client.attach_pushover(pushover_client)
-
-# Set up Nebula API client
-nebula_client = nebula.Client(cfg['nebula']['url'],cfg['nebula']['key'])
+log_client.attach_nebula(nebula_client)
 
 # Set up Arduino API clients
-arduino_guardhouse = arduino.Client(cfg['arduino']['guardhouse']['ip'])
-arduino_mainhouse = arduino.Client(cfg['arduino']['mainhouse']['ip'])
+arduino_guardhouse = arduino.Client(**cfg['arduino']['guardhouse'])
+arduino_mainhouse = arduino.Client(**cfg['arduino']['mainhouse'])
 
 # Set up P1 client
 p1_client = P1.Client('/dev/ttyUSB0')
@@ -85,8 +86,8 @@ def main():
         'c1': 1,                                                        # Cumulative Flag [-]
         'v1': data_mainhouse['E_PV'],                                   # Energy Generation [Wh]
         'v2': data_mainhouse['P_PV'],                                   # Power Generation [W]
-        'v3': data_mainhouse['E_PV'] + p1_client.get_energy(),          # Energy Consumption [Wh]
-        'v4': data_mainhouse['P_PV'] + p1_client.get_power(),           # Power Consumption [W]
+        'v3': data_mainhouse['E_PV'] + p1_client.energy,                # Energy Consumption [Wh]
+        'v4': data_mainhouse['P_PV'] + p1_client.power,                 # Power Consumption [W]
     }
     if data_guardhouse is not None:
         payload.update({
@@ -103,13 +104,18 @@ def main():
             print('Post PVOutput payload..')
             print('PVOutput payload: %s' % payload)
         r = requests.post(cfg['pvoutput']['url'], headers=headers, params=payload)
-        log_client.info('Energy data upload: %s' % r.content)
+        log_client.info('PVOutput energy data upload: %s' % r.text)
         log_client.debug('PVOutput payload: %s' % payload)
 
     # Prepare Nebula payload
+    E_prod = data_mainhouse['E_PV']                                         # Solar Energy Production [Wh]
+    E_cons = data_mainhouse['E_PV'] + p1_client.energy                      # Local Energy Consumption [Wh]
+    P_prod = diff(E_prod, 'E_prod') * (60 / 5)                              # 5 minute average Solar Energy Production [W]
+    P_cons = diff(E_cons, 'E_cons') * (60 / 5)                              # 5-minute averaged Local Energy Consumption [W]
+
     payload = {
-        '6':  data_mainhouse['P_PV'],                                       # Power Generation [W]
-        '5':  data_mainhouse['P_PV'] + p1_client.power,                     # Power Consumption [W]
+        '6':  P_prod,                                                       # 5 minute average Solar Energy Production [W]
+        '5':  P_cons,                                                       # 5-minute averaged Local Energy Consumption [W]
         '22': p1_client.energy / 1000.0,                                    # Net Energy Consumption [kWh]
         '23': psutil.cpu_percent(),                                         # Current system-wide CPU utilization [%]
         '25': psutil.virtual_memory().percent,                              # Current memory usage [%]
@@ -138,7 +144,10 @@ def main():
     if verbose:
             print('Post Nebula payload..')
             print('Nebula payload: %s' % payload)
-    nebula_client.post_many(payload)
+    r = nebula_client.post_many(payload)
+    nebula_client.info('Nebula upload: %s' % r.text)
+    nebula_client.debug('Nebula payload: %s' % payload)
+
 
 if __name__ == "__main__":
     main()
