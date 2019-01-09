@@ -1,5 +1,3 @@
-# Python3
-
 import re
 from PyCRC.CRC16 import CRC16
 import serial
@@ -25,9 +23,9 @@ class Client:
         self.ser = serial.Serial()
         self.ser.port = port
         self.ser.baudrate = 115200
-        self.ser.parity = 'N'
-        self.ser.bytesize = 8
-        self.ser.stopbits = 1
+        self.ser.parity = serial.PARITY_NONE
+        self.ser.bytesize = serial.EIGHTBITS
+        self.ser.stopbits = serial.STOPBITS_ONE
 
         # P1 configuration
         self.telegram = []
@@ -46,62 +44,39 @@ class Client:
         self.logger = logger
 
     def open_port(self):
-        if not self.ser.isOpen():
-            try:
-                self.ser.open()
-                if self.logger:
-                    self.logger.debug('Opened serial port \'%s\'' % self.ser.port)
-                return True
-            except serial.SerialException:
-                if self.logger:
-                    self.logger.error('Failed to open serial port \'%s\'' % self.ser.port)
-                return False
-        else:
+        try:
+            self.ser.open()
+        except serial.SerialException as e:
             if self.logger:
-                self.logger.debug('Tried to open port \'%s\', but it was already open' % self.ser.port)
+                self.logger.error('Failed to open serial port \'%s\' [\'%s\'' % (self.ser.port, str(e)))
+            return False
+        else:
+            return True
 
     def close_port(self):
-        if self.ser.isOpen():
-            self.ser.close()
-            if self.logger:
-                self.logger.debug('Closed serial port \'%s\'' % self.ser.port)
-        else:
-            if self.logger:
-                self.logger.debug('Tried to close port \'%s\', but it was already closed' % self.ser.port)
+        self.ser.close()
 
     def read_line(self):
-        if self.ser.isOpen():
-            line = self.ser.readline().decode('utf-8')
-            if self.logger:
-                self.logger.debug('[P1]: %s' % line.strip())
-            return str(line)
+        line = self.ser.readline().decode('ascii')
+        return line
 
-    def add_line_to_telegram(self, line, add_to_crc=True):
+    def add_line_to_telegram(self, line):
         self.telegram.append(line.strip())
-        if add_to_crc:
+        if not line.startswith('!'):
             self.crc_data += line
 
     def new_telegram(self):
-        self.telegram = []
+        self.telegram.clear()
         self.crc_data = ''
 
     def verify_crc(self):
-        # Add EOT_CHAR to CRC data
-        self.crc_data += '!'
         # Get received CRC from last last of telegram
         crc_received = self.telegram[len(self.telegram)-1][1:]  # Remove EOT_CHAR from received CRC
         # Compute CRC from received data
-        crc = "0x{:04x}".format(CRC16().calculate(self.crc_data))
+        crc = "0x{:04x}".format(CRC16().calculate(self.crc_data+'!'))
         crc = crc[2:].upper()
-        # Verify received CRC matches data
-        if crc == crc_received:
-            if self.logger:
-                self.logger.debug('Valid data, CRC match: 0x%s' % crc)
-            return True
-        else:
-            if self.logger:
-                self.logger.debug('CRC mismatch: 0x%s / 0x%s' % (crc, crc_received))
-            return False
+        # Return verified CRC
+        return crc == crc_received
 
     def process_telegram(self):
         # Reset power and energy variables
@@ -114,24 +89,17 @@ class Client:
                 if self.telegram[line].startswith(ref):
                     m = re.search(regex, self.telegram[line])
                     if self.telegram[line].startswith('1-0:1.8'):
-                        self.energy += float(m.group(3))
+                        self.energy += float(m.group(3))*1000               # kWh => Wh
                     elif self.telegram[line].startswith('1-0:2.8'):
-                        self.energy -= float(m.group(3))
+                        self.energy -= float(m.group(3))*1000               # kWh => Wh
                     elif self.telegram[line].startswith('1-0:1.7'):
-                        self.power += float(m.group(3))
+                        self.power += float(m.group(3))*1000                # kW => W
                     elif self.telegram[line].startswith('1-0:2.7'):
-                        self.power -= float(m.group(3))
-
-        # Convert from kW(h) to W(h)
-        self.power *= 1000.0
-        self.energy *= 1000.0
+                        self.power -= float(m.group(3))*1000                # kW => W
 
     def read_telegram(self):
-
         # Open serial port
         for itt in range(1, self.retries):
-            if self.logger:
-                self.logger.debug('Starting P1 iteration %d' % itt)
             if self.open_port():
                 # Start receiving data
                 line = self.read_line()
@@ -140,34 +108,23 @@ class Client:
                 line_no = 0
                 while not line.startswith('/'):
                     line = self.read_line()
-                    line_no += 1
-                    if line_no >= TELEGRAM_LENGTH:
-                        self.close_port()
-                        break
 
-                if line_no >= TELEGRAM_LENGTH:
-                    if self.logger:
-                        self.logger.info('Invalid telegram [serial number not found]')
-                else:
-                    # Start of transmission detected
-                    self.logger.debug('Valid telegram [found after %d lines read]' % line_no)
-                    self.new_telegram()
+                # Start of transmission detected
+                self.new_telegram()
+                self.add_line_to_telegram(line)
+
+                # Read until end of telegram character detected
+                while not line.startswith(EOT_CHAR):
+                    line = self.read_line()
                     self.add_line_to_telegram(line)
 
-                    # Read until end of telegram character detected
-                    while not line.startswith(EOT_CHAR):
-                        line = self.read_line()
-                        if not line.startswith(EOT_CHAR):
-                            self.add_line_to_telegram(line)
-                        else:
-                            # Do not add line with EOT char to CRC
-                            self.add_line_to_telegram(line, False)
-                    self.close_port()
+                # Complete telegram received close port
+                self.close_port()
 
-                    # Verify CRC
-                    if self.verify_crc():
-                        self.process_telegram()
-                        return True
+                # Verify CRC
+                if self.verify_crc():
+                    self.process_telegram()
+                    return True
             else:
                 sleep(self.retry_delay)
 

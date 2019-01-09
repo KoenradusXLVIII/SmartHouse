@@ -1,5 +1,3 @@
-# Python3
-
 # Public packages
 import requests
 import os

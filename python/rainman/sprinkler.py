@@ -1,5 +1,3 @@
-# Python3
-
 # Public packages
 import sys
 from time import sleep

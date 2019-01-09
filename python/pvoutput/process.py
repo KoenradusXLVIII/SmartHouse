@@ -12,7 +12,7 @@ import logger
 import nebula
 import arduino
 import pushover
-from diff import diff
+from diff import dx, dxdt
 
 # Check command line parameters
 local = False  # Upload to PVOutput
@@ -60,7 +60,7 @@ def main():
     data_mainhouse = arduino_mainhouse.get_all()
     if data_mainhouse is not None:
         # Post-process water data
-        data_mainhouse['H2O'] = diff(data_mainhouse['H2O'], 'H2O')
+        data_mainhouse['H2O'] = dx(data_mainhouse['H2O'], 'H2O')
     else:
         log_client.error('No data received from Main House')
         sys.exit()
@@ -117,8 +117,8 @@ def main():
     # Prepare Nebula payload
     E_prod = data_mainhouse['E_PV']                                         # Solar Energy Production [Wh]
     E_cons = data_mainhouse['E_PV'] + p1_client.energy                      # Local Energy Consumption [Wh]
-    P_prod = diff(E_prod, 'E_prod') * (60 / 5)                              # 5 minute average Solar Energy Production [W]
-    P_cons = diff(E_cons, 'E_cons') * (60 / 5)                              # 5-minute averaged Local Energy Consumption [W]
+    P_prod = dxdt(E_prod, 'E_prod') * 3600                                  # Solar Energy Production [W]
+    P_cons = dxdt(E_cons, 'E_cons') * 3600                                  # Local Energy Consumption [W]
 
     payload = {
         '6':  P_prod,                                                       # 5 minute average Solar Energy Production [W]
