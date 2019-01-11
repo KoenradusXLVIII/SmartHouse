@@ -123,7 +123,9 @@ def main():
     payload = {
         '6':  P_prod,                                                       # 5 minute average Solar Energy Production [W]
         '5':  P_cons,                                                       # 5-minute averaged Local Energy Consumption [W]
-        '22': p1_client.energy / 1000.0,                                    # Net Energy Consumption [kWh]
+        '22': p1_client.energy / 1000,                                      # Net Energy Consumption [kWh]
+        '46': E_cons / 1000,                                                # Local Energy Consumption [kWh]
+        '47': E_prod / 1000,                                                # Solar Energy Production [kWh]
         '23': psutil.cpu_percent(),                                         # Current system-wide CPU utilization [%]
         '25': psutil.virtual_memory().percent,                              # Current memory usage [%]
         '26': psutil.disk_usage('/').percent,                               # Current disk usage [%]

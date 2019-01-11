@@ -1,4 +1,4 @@
-# Run with logging: python foscam_dev_state.py >> foscam_dev_state.py.log 2>&1 &
+# Run with logging: python3 foscam_dev_state.py >> foscam_dev_state.py.log 2>&1 &
 
 # Public pacakages
 import requests
