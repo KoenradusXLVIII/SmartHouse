@@ -10,6 +10,7 @@ import yaml
 # Private packages
 import arduino
 import nebula
+import wunderground
 
 ON = 0
 OFF = 1
@@ -23,6 +24,9 @@ nebula_client = nebula.Client(**cfg['nebula'])
 
 # Set up Guard House Arduino client
 arduino_client = arduino.Client(**cfg['guardhouse'])
+
+# Set up Weather Underground client
+wu_client = wunderground.Client(**cfg['WU'])
 
 # Settings
 # Limits
@@ -63,7 +67,6 @@ path = os.path.dirname(os.path.realpath(__file__))
 # Run forecast once a day at 6 o'clock or forced
 if hour == 6 or force:
     # Define variables
-    qpf_allday = []
     qpf_days_ahead = 0
     lim_days_ahead = 0
     sprinkler_times = []
@@ -71,11 +74,9 @@ if hour == 6 or force:
     sprinkler_mode = 'off'
 
     # Query API
-    try:
-        data = requests.get(cfg['WU']['base_url'] + "forecast10day" + cfg['WU']['city'], timeout=1).json()
-    except ConnectionError:
-        nebula_client.error('No data received from Weather Underground')
-        # Write forecast to file
+
+    # Write forecast to file
+    if wu_client.forecast10day():
         with open(path + '/sprinkler.pickle', 'w') as fp:
             # Write 'safe' values to pickle file (no sprinkling)
             pickle.dump([0, 0, 0, 0, 'off', 0, []], fp)
@@ -96,39 +97,33 @@ if hour == 6 or force:
 
     # Get 10 day forecast
     # Temperature
-    today_high_temp = int(data['forecast']['simpleforecast']['forecastday'][0]['high']['celsius'])
     if verbose:
-        print('Todays maximum temperature is: %dC' % today_high_temp)
-    # Quantitative Precipitation Forecast
-    for d in range(0, 10):
-        qpf_allday.append(int(data['forecast']['simpleforecast']['forecastday'][d]['qpf_allday']['mm']))
-
-    if verbose:
+        print('Todays maximum temperature is: %dC' % wu_client.today_high_temperature)
         print('Yesterday recorded rain: %s mm' % qpf_yesterday)
-        print('Next 10 days rain forecast per day is: [%s] mm' % str(qpf_allday)[1:-1])
+        print('Next 10 days rain forecast per day is: [%s] mm' % str(wu_client.qpf_allday)[1:-1])
 
     # Process forecast to sprinkler mode
-    if today_high_temp > lim_high_temp:
+    if wu_client.today_high_temperature > lim_high_temp:
         if qpf_yesterday < lim_qpf_yesterday_high_temp:
-            qpf_days_ahead = sum(qpf_allday[0:lim_days_ahead_high_temp])
+            qpf_days_ahead = sum(wu_client.qpf_allday[0:lim_days_ahead_high_temp])
             lim_days_ahead = lim_days_ahead_high_temp
             if qpf_days_ahead < lim_qpf_ahead_high_temp:
                 # Very hot and no rain today so high sprinkler mode
                 sprinkler_duration = high_duration
                 sprinkler_times = high_times
                 sprinkler_mode = 'high'
-    elif today_high_temp > lim_med_temp:
+    elif wu_client.today_high_temperature > lim_med_temp:
         if qpf_yesterday < lim_qpf_yesterday_med_temp:
-            qpf_days_ahead = sum(qpf_allday[0:lim_days_ahead_med_temp])
+            qpf_days_ahead = sum(wu_client.qpf_allday[0:lim_days_ahead_med_temp])
             lim_days_ahead = lim_days_ahead_med_temp
             if qpf_days_ahead < lim_qpf_ahead_med_temp:
                 # Hot and no rain today so medium sprinkler mode
                 sprinkler_duration = med_duration
                 sprinkler_times = med_times
                 sprinkler_mode = 'medium'
-    elif today_high_temp > lim_low_temp:
+    elif wu_client.today_high_temperature > lim_low_temp:
         if qpf_yesterday < lim_qpf_yesterday_low_temp:
-            qpf_days_ahead = sum(qpf_allday[0:lim_days_ahead_low_temp])
+            qpf_days_ahead = sum(wu_client.qpf_allday[0:lim_days_ahead_low_temp])
             lim_days_ahead = lim_days_ahead_low_temp
             if qpf_days_ahead < lim_qpf_ahead_low_temp:
                 # Warm and no rain next x days so low sprinkler mode
@@ -139,24 +134,24 @@ if hour == 6 or force:
     if verbose:
         if lim_days_ahead:
             print('Next %d days rain forecast in total is: [%s] mm' %
-                  (lim_days_ahead, str(qpf_allday)[1:3*lim_days_ahead-1]))
+                  (lim_days_ahead, str(wu_client.qpf_allday)[1:3*lim_days_ahead-1]))
         print('Sprinkler mode for today is: %s' % sprinkler_mode)
 
     # Write daily forecast summary to logging
     nebula_client.info("= DAILY WEATHER FORECAST =")
-    nebula_client.info("Forecasted maximum temperature is: %dC" % today_high_temp)
+    nebula_client.info("Forecasted maximum temperature is: %dC" % wu_client.today_high_temperature)
     nebula_client.info("Yesterday recorded rain: %s mm" % qpf_yesterday)
-    nebula_client.info("Next 10 days rain forecast per day is: [%s] mm" % (str(qpf_allday)[1:-1]))
+    nebula_client.info("Next 10 days rain forecast per day is: [%s] mm" % (str(wu_client.qpf_allday)[1:-1]))
     if lim_days_ahead:
         nebula_client.info("Next %d days rain forecast in total is: [%s] mm" %
-                           (lim_days_ahead, str(qpf_allday)[1:3*lim_days_ahead-1]))
+                           (lim_days_ahead, str(wu_client.qpf_allday)[1:3*lim_days_ahead-1]))
     nebula_client.info("Sprinkler mode for today is: %s" % sprinkler_mode)
 
     # Store today's precipitation for tomorrow
-    qpf_yesterday = qpf_allday[0]
+    qpf_yesterday = wu_client.qpf_allday[0]
     # Write forecast to file
     with open(path + '/sprinkler.pickle', 'wb') as fp:
-        pickle.dump([today_high_temp, qpf_allday, qpf_yesterday, lim_days_ahead,
+        pickle.dump([wu_client.today_high_temperature, wu_client.qpf_allday, qpf_yesterday, lim_days_ahead,
                      sprinkler_mode, sprinkler_duration, sprinkler_times], fp)
 
 with open(path + '/sprinkler.pickle', 'rb') as fp:
