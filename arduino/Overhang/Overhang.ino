@@ -4,9 +4,12 @@
 #define SERIAL_BUFFER 32
 #define CRC_LENGTH 4 // 16 bits, encoded in HEX
 
+// Pins
+#define LIGHT_PIN 2
+#define STROBE_PIN 3
+
 // Serial buffer
 char charSerial[SERIAL_BUFFER] = "";
-char charSerial1[SERIAL_BUFFER] = "";
 
 // CRC16 library
 Crc16 crc;
@@ -14,38 +17,29 @@ char charCrc[CRC_LENGTH+1] = "0000";
 bool boolCrc;
 
 void setup() {
-  Serial.begin(9600);
-  Serial1.begin(4800);
+  Serial.begin(4800);
 }
 
 void loop() {
-  // Transmit any outbound messages
-  if (Serial.available()) {
-    int i = 0;                      // Read message from terminal
-    while (Serial.available()) {
-      charSerial[i++] = Serial.read();
-      delay(10);
-    }
-    charSerial[i] = '\0';           // Terminate message
-    sendCrc(charSerial, true);      // Send with CRC
-  }
+  // Receive any inbound messages
+  recCrc(true);
 }
 
 bool recCrc(bool boolAck) {
-  crc.clearCrc();                   // Reset CRC
+  crc.clearCrc();
   boolCrc = false;
   int i = 0;
-  while (Serial1.available()) {     // Read from serial interface
-    char c = Serial1.read();
-    if (c == '!') {                 // Start of CRC detected
+  while (Serial.available()) {
+    char c = Serial.read();
+    if (c == '!') {
       charSerial[i] = '\0';
       boolCrc = true;
       i = 0;
-      c = Serial1.read();
+      c = Serial.read();
     }
     if (!boolCrc) {
       charSerial[i++] = c;   
-      crc.updateCrc(c);             // Update CRC
+      crc.updateCrc(c);
     } else {
       charCrc[i++] = c;  
     }
@@ -82,23 +76,17 @@ bool checkCrc() {
 void sendCrc(char * msg, bool boolAck) {
   unsigned short value = crc.XModemCrc(msg,0,strlen(msg));
 
-  // Debug
-  Serial.print("Message: ");
-  Serial.print(charSerial);
-
   // Send message with CRC
-  Serial1.print(msg);
-  Serial1.print('!');
-  Serial1.print(value, HEX);
+  Serial.print(msg);
+  Serial.print('!');
+  Serial.print(value, HEX);
 
   // Wait for acknowledgement?
   if (boolAck) {
-    while (!Serial1.available()) {
+    while (!Serial.available()) {
     }                                 // Wait for acknowledgement  
     
-    if (recCrc(false))                // Do not re-acknowledge acknowledgement
-      Serial.println(" [OK]");
-    else
-      Serial.println(" [NOK]");
+    if (!recCrc(false))               // Do not re-acknowledge acknowledgement
+      delay(1);                       // TODO: Replace with resend
   }
 }
