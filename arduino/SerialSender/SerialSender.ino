@@ -1,8 +1,10 @@
 #include <Crc16.h>
 
 // Configuration
-#define SERIAL_BUFFER 32
-#define CRC_LENGTH 4 // 16 bits, encoded in HEX
+#define SERIAL_BUFFER 32    // max 32 bits, including CRC (3)
+#define SERIAL_RETRIES 3
+#define SERIAL_TIMEOUT 2000 // milliseconds
+#define CRC_LENGTH 4        // 16 bits, encoded in HEX
 
 // Serial buffer
 char charSerial[SERIAL_BUFFER] = "";
@@ -19,16 +21,29 @@ void setup() {
 }
 
 void loop() {
-  // Transmit any outbound messages
+  /*Transmit any outbound messages
   if (Serial.available()) {
-    int i = 0;                      // Read message from terminal
+    int i = 0;                          // Read message from terminal
     while (Serial.available()) {
       charSerial[i++] = Serial.read();
-      delay(10);
+      delay(10);  
     }
-    charSerial[i] = '\0';           // Terminate message
-    sendCrc(charSerial, true);      // Send with CRC
+    charSerial[i] = '\0';               // Terminate message
+    if (sendCrc(charSerial, true)) {    // Send with CRC
+      Serial.println(" [OK]");
+    } else {
+      Serial.println(" [NOK]");
+    }
+  }*/
+
+  strcpy(charSerial,"Transfer data via serial");
+  if (sendCrc(charSerial, true)) {    // Send with CRC
+    Serial.println(" [OK]");
+  } else {
+    Serial.println(" [NOK]");
   }
+  delay(2000);
+  
 }
 
 bool recCrc(bool boolAck) {
@@ -79,12 +94,12 @@ bool checkCrc() {
   return (recCrc == crc.getCrc());
 }
 
-void sendCrc(char * msg, bool boolAck) {
+bool sendCrc(char * msg, bool boolAck) {
   unsigned short value = crc.XModemCrc(msg,0,strlen(msg));
 
   // Debug
   Serial.print("Message: ");
-  Serial.print(charSerial);
+  Serial.print(msg);
 
   // Send message with CRC
   Serial1.print(msg);
@@ -93,12 +108,30 @@ void sendCrc(char * msg, bool boolAck) {
 
   // Wait for acknowledgement?
   if (boolAck) {
-    while (!Serial1.available()) {
-    }                                 // Wait for acknowledgement  
-    
-    if (recCrc(false))                // Do not re-acknowledge acknowledgement
-      Serial.println(" [OK]");
-    else
-      Serial.println(" [NOK]");
-  }
+    unsigned long start_time = millis();
+    unsigned long cur_time = start_time;
+    for (int itt = 0; itt < SERIAL_RETRIES; itt++) {
+      Serial.print(itt);
+      while ((cur_time - start_time) < SERIAL_TIMEOUT) {        
+        // Wait for acknowledgement until timeout
+        if (Serial1.available()) {
+          // Ready to receive acknowledgement  
+          if (recCrc(false)) {
+            // Acknowledgement received
+            return true;
+          } else {
+            // CRC error occured, resend...
+            Serial1.print(msg);
+            Serial1.print('!');
+            Serial1.print(value, HEX);
+            break;
+          }
+        }
+        cur_time = millis();
+      }
+      // Timeout!
+      start_time = millis();  
+    }
+    return false;
+  }          
 }

@@ -3,28 +3,31 @@
 #include <dht.h>
 #include <SHT1x.h>
 #include "Json.h"
+#include <Crc16.h>
 
 // Pins [Pins 10 through 13 in use by Ethernet shield]
-#define DHT21_PIN 2
-#define DOOR_CONTACT_PIN 3
-#define LIGHT_RELAY_PIN 4
-#define LIGHT_OVERRIDE_PIN 5
-#define VALVE_PIN 6
-#define WATER_OVERRIDE_PIN 7
-#define RAIN_IN_PIN 8
-#define RAIN_OUT_PIN 9
-#define SHT10_DATA_PIN 14
-#define SHT10_CLK_PIN 15
-#define LIGHT_SENSOR_PIN 16
-#define CHRISTMAS_PIN 17
+#define DHT21_PIN 23            // Screw shield A5
+#define DOOR_CONTACT_PIN 25     // Screw shield A4
+#define LIGHT_RELAY_PIN 27      // Screw shield A3
+#define LIGHT_OVERRIDE_PIN 29   // Screw shield A2
+#define VALVE_PIN 31            // Screw shield A1
+#define WATER_OVERRIDE_PIN 33   // Screw shield A0
+#define RAIN_IN_PIN 37          // Screw shield VIN
+#define RAIN_OUT_PIN 39         // Screw shield GND
+#define SHT10_DATA_PIN 41       // Screw shield GND
+#define SHT10_CLK_PIN 43        // Screw shield 5V
+#define LIGHT_SENSOR_PIN 45     // Screw shield 3V3
+#define CHRISTMAS_PIN 47        // Screw shield RESET
 
 // Configuration
 #define BUFFER 64
 #define RAIN_CALIBRATION 3 // ml/pulse
-
-// Defines
 #define VAR_COUNT 13
-#define MAX_LINE_LENGTH 100
+#define MAX_LINE_LENGTH 200
+#define SERIAL_BUFFER 32
+#define CRC_LENGTH 4 // 16 bits, encoded in HEX
+#define SERIAL_RETRIES 3
+#define SERIAL_TIMEOUT 2000 // milliseconds
 
 // Aliases
 #define CLOSED 0
@@ -56,9 +59,9 @@
 // Enter a MAC address and IP address for your controller below.
 // The IP address will be dependent on your local network:
 byte mac[] = {
-  0x90, 0xA2, 0xDA, 0x0E, 0xC5, 0x67
+  0x90, 0xA2, 0xDA, 0x0E, 0xC5, 0x68
 };
-IPAddress ip(192, 168, 1, 112);
+IPAddress ip(192, 168, 1, 120);
 
 // Initialize the Ethernet server library
 // with the IP address and port you want to use
@@ -66,6 +69,7 @@ IPAddress ip(192, 168, 1, 112);
 EthernetServer server(80);
 // '{"VAR_NAME":VAR_VALUE,"VAR_NAME":VAR_VALUE,...,"VAR_NAME":VAR_VALUE}\0'
 char charResponse[1+VAR_COUNT*(1+VAR_NAME_MAX_LENGTH+1+1+VAR_VALUE_MAX_LENGTH+1)-1+1+1];
+char charCommand[VAR_NAME_MAX_LENGTH+VAR_VALUE_MAX_LENGTH+1] = "test_data";
  
 // Initialize SHT10
 // VCC - Brown - Red
@@ -79,6 +83,15 @@ dht DHT;
 
 // JSON library
 Json json;
+
+// Serial variables
+char charSerial[SERIAL_BUFFER] = "";
+char charSerial1[SERIAL_BUFFER] = "";
+Crc16 crc;
+char charCrc[CRC_LENGTH+1] = "0000";
+bool boolCrc;
+const char charMotorLightOn[] = "motor_light/1";
+const char charMotorLightOff[] = "motor_light/0";
 
 // Define variables
   const char var_array[VAR_COUNT][VAR_NAME_MAX_LENGTH] =
@@ -96,6 +109,7 @@ Json json;
   // Digital I/O variables
   int prev_door_state = CLOSED;         // Default to closed
   int prev_day_night_state = DAY;       // Default to day
+  int prev_motor_light_state = OFF;     // Default to off
 
   // Timers
   bool timer_on = false;                // Default timer off
@@ -105,11 +119,8 @@ Json json;
   int prev_rain_state = HIGH;
 
 void setup() {
-  // Open serial communications and wait for port to open:
   Serial.begin(9600);
-  while (!Serial) {
-    ; // wait for serial port to connect. Needed for native USB port only
-  }
+  Serial1.begin(4800);
 
   // Initialze pins
   pinMode(DOOR_CONTACT_PIN,INPUT);
@@ -147,6 +158,16 @@ void setup() {
 }
 
 void loop() {
+  // Manage serial communication to Overhang
+  /*if (Serial1.available()) {
+    int i = 0;
+    while (Serial1.available()) {
+      charSerial[i++] = Serial1.read();;
+    }
+    charSerial[i] = '\0';
+    Serial.print(charSerial);
+  }*/
+  
   // Get new filtered DHT21 values
   value_array[TEMP] = read_filtered_DHT(buf_temp,TEMP);
   value_array[HUMI] = read_filtered_DHT(buf_humi,HUMI);
@@ -170,6 +191,20 @@ void loop() {
     digitalWrite(CHRISTMAS_PIN, LOW);    
   prev_day_night_state = value_array[DAY_NIGHT];
 
+  // Motor light
+  if((value_array[MOTOR_LIGHT] == OFF) && (prev_motor_light_state == ON)) {
+    if (!sendCrc(charMotorLightOff, true)) {
+      // Failed to transmit data to Overhang, reset local representation
+      value_array[MOTOR_LIGHT] = ON;
+    }
+  } else if ((value_array[MOTOR_LIGHT] == ON) && (prev_motor_light_state == OFF)) {
+    if (!sendCrc(charMotorLightOn, true)) {
+      // Failed to transmit data to Overhang, reset local representation
+      value_array[MOTOR_LIGHT] = OFF;
+    }
+  }    
+  prev_motor_light_state = value_array[MOTOR_LIGHT];  
+
   // Soil moisture sensor
   value_array[SOIL_HUMI] = sht10.readHumidity();
   
@@ -177,10 +212,10 @@ void loop() {
   EthernetClient client = server.available();
   if (client) {
     char charReadLine[MAX_LINE_LENGTH];
-    char charCommand[VAR_NAME_MAX_LENGTH+VAR_VALUE_MAX_LENGTH+1];
     boolean currentLineIsBlank = true;
     int i = 0;
     char c;
+    //Serial.println("New client connected");
     
     while (client.connected()) {
       if (client.available()) {
@@ -197,8 +232,11 @@ void loop() {
         // so you can send a reply
         if (c == '\n' && currentLineIsBlank) {
           // Parse command
-          //Serial.println(charCommand);
-          parse_command(charCommand);
+          if (strlen(charCommand)) {
+            //Serial.print("End of HTTP request, processing charCommand: ");
+            //Serial.println(charCommand);
+            parse_command(charCommand);
+          }
           
           // Initialise JSON response
           client.println(F("HTTP/1.1 200 OK"));
@@ -210,13 +248,22 @@ void loop() {
         }
 
         if (c == '\n') {
+          //Serial.println(charCommand);
+          //Serial.println(charReadLine);
           // EOL character received
           if ((charReadLine[0] == 'G') && (charReadLine[1] == 'E') && (charReadLine[2] == 'T')) {
-            // GET command received, stripping... 
-            // From the front: "GET /" - 5 characters
-            // From the back: " HTTP/1.1" - 9 charachters
-            strncpy(charCommand,&charReadLine[5],strlen(charReadLine)-16);
-            charCommand[strlen(charReadLine)-16] = '\0';
+            if ((charReadLine[13] != 'i') && (charReadLine[13] != 'c') && (charReadLine[13] != 'o')) {
+              // GET command received, stripping... 
+              // From the front: "GET /" - 5 characters
+              // From the back: " HTTP/1.1" - 9 charachters
+              //Serial.print(charReadLine);
+              strncpy(charCommand,&charReadLine[5],strlen(charReadLine)-16);
+              charCommand[strlen(charReadLine)-16] = '\0';
+              //Serial.print("New GET sets charCommand to: ");
+              //Serial.println(charCommand);
+            } else {
+              charCommand[0] = '\0';
+            }
           }
           // Erase line and reset character pointer
           charReadLine[0] = '\0';
@@ -407,4 +454,96 @@ void return_all() {
       strcat(charResponse, ",\""); 
   }
   strcat(charResponse,"}");
+}
+
+bool recCrc(bool boolAck) {
+  crc.clearCrc();                   // Reset CRC
+  boolCrc = false;
+  int i = 0;
+  while (Serial1.available()) {     // Read from serial interface
+    char c = Serial1.read();
+    if (c == '!') {                 // Start of CRC detected
+      charSerial[i] = '\0';
+      boolCrc = true;
+      i = 0;
+      c = Serial1.read();
+    }
+    if (!boolCrc) {
+      charSerial[i++] = c;   
+      crc.updateCrc(c);             // Update CRC
+    } else {
+      charCrc[i++] = c;  
+    }
+    delay(10);   
+  }  
+
+  // Process inbound message
+  if (strlen(charSerial)) {         // New message detected
+    if (boolAck) {                  // Acknowledgement required
+      if (checkCrc()) {             // Check CRC
+        sendCrc("OK", false);       // Cyclic redundancy check OK, send without expecting acknowledgement
+        charSerial[0] = '\0';       // Reset serial buffer
+        return true;                 
+      } else { 
+        sendCrc("NOK", false);      // Cyclic redundancy check NOK, send without expecting acknowledgement
+        charSerial[0] = '\0';
+        return false;
+      }
+    } else {                        // No acknowledgement required
+      return checkCrc();            // Verify CRC
+    }   
+  }
+}
+
+bool checkCrc() {
+  unsigned short recCrc = 0;
+  for (int i=0; i < CRC_LENGTH; i++) {
+    int digit = (charCrc[i] >= 'A') ? charCrc[i] - 'A' + 10 : charCrc[i] - '0';
+    recCrc = recCrc + (digit << (4 * (CRC_LENGTH-1-i)));
+  } 
+  return (recCrc == crc.getCrc());
+}
+
+bool sendCrc(char * msg, bool boolAck) {
+  unsigned short value = crc.XModemCrc(msg,0,strlen(msg));
+
+  // Debug
+  Serial.print("Message: ");
+  Serial.print(msg);
+  Serial.print(" - ");
+
+  // Send message with CRC
+  Serial1.print(msg);
+  Serial1.print('!');
+  Serial1.print(value, HEX);
+
+  // Wait for acknowledgement?
+  if (boolAck) {
+    unsigned long start_time = millis();
+    unsigned long cur_time = start_time;
+    for (int itt = 0; itt < SERIAL_RETRIES; itt++) {
+      Serial.print(itt);
+      while ((cur_time - start_time) < SERIAL_TIMEOUT) {        
+        // Wait for acknowledgement until timeout
+        if (Serial1.available()) {
+          // Ready to receive acknowledgement  
+          if (recCrc(false)) {
+            // Acknowledgement received
+            Serial.println("");
+            return true;
+          } else {
+            // CRC error occured, resend...
+            Serial1.print(msg);
+            Serial1.print('!');
+            Serial1.print(value, HEX);
+            break;
+          }
+        }
+        cur_time = millis();
+      }
+      // Timeout!
+      start_time = millis();  
+    }
+    return false;
+  }          
 }

@@ -39,74 +39,84 @@ def main():
     last_infra_led_state = 0
     motor_light_state = 0
     motion_timer = 0
+    time_out = cfg['foscam']['interval']['poll'];
+
 
     nebula_client.info('Foscam and Pushover monitoring scripts activated')
     while True:
         # Sleep for 5 seconds
-        time.sleep(5)
+        time.sleep(time_out)
 
         # Get Foscam device state
         foscam_dev_state = devstate()
 
-        # Check to see if infrared LEDs on (detect day/night transition)
-        infra_led_state = int(foscam_dev_state.find('infraLedState').text)
-        if infra_led_state != last_infra_led_state:
-            # Update Guard House API
-            if arduino_client.set_value('day_night', infra_led_state):
-                if infra_led_state:  # night
-                    nebula_client.info('Transition to night written to Guard House API')
-                    # If no one home turns lights on in 'not home' mode
-                    if hue_client.get_all_off():
-                        hue_client.set_scene('Not home')
-                        nebula_client.info('Switching lights on to \'Not home\' mode')
-                else:  # day
-                    nebula_client.info('Transition to day written to Guard House API')
+        if foscam_dev_state:
+            # Reset time out to default
+            if time_out == cfg['foscam']['interval']['time-out']:
+                time_out = cfg['foscam']['interval']['poll']
+                nebula_client.info('Time-out reset to default polling interval: %d seconds' % time_out)
+            # Check to see if infrared LEDs on (detect day/night transition)
+            infra_led_state = int(foscam_dev_state.find('infraLedState').text)
+            if infra_led_state != last_infra_led_state:
+                # Update Guard House API
+                if arduino_client.set_value('day_night', infra_led_state):
+                    if infra_led_state:  # night
+                        nebula_client.info('Transition to night written to Guard House API')
+                        # If no one home turns lights on in 'not home' mode
+                        if hue_client.get_all_off():
+                            hue_client.set_scene('Not home')
+                            nebula_client.info('Switching lights on to \'Not home\' mode')
+                    else:  # day
+                        nebula_client.info('Transition to day written to Guard House API')
+                else:
+                    nebula_client.warning('Failed to write \'day_night\' to Guard House API')
+
+            last_infra_led_state = infra_led_state
+
+            # Check for motion detection
+            motion_detect = foscam_dev_state.find('motionDetectAlarm').text
+            if (last_motion_state == cfg['foscam']['state']['no alarm']) and (
+                    motion_detect == cfg['foscam']['state']['alarm']):
+                # Log to Nebula
+                nebula_client.warning('Motion alert!')
+
+                if (time.time() - motion_timer) > cfg['motor']['hysteresis']:
+                    nebula_client.debug('New motion detected outside hysteresis interval, starting counter')
+                    # Alarm handling
+                    if arduino_client.get_value('alarm_mode'):
+                        pushover_client.message('Alarm triggered!', snapshot(), 'GuardHouse Security', 'high', 'alien')
+
+                    # Light handling
+                    if arduino_client.get_value('day_night'):
+                        # It is dark out so we should turn the light on if...
+                        if not motor_light_state:
+                            # ... it is off
+                            motor_light_state = 1
+                            if arduino_client.set_value('motor_light', motor_light_state):
+                                nebula_client.debug('Wrote \'HIGH\' to \'motor_light\' to the Guard House API')
+                            else:
+                                nebula_client.warning('Failed to write \'motor_light\' to the Guard House API')
+                else:
+                    nebula_client.debug('Motion detected within hysteresis interval, resetting counter')
+
+                motion_timer = time.time()
             else:
-                nebula_client.warning('Failed to write \'day_night\' to Guard House API')
-
-        last_infra_led_state = infra_led_state
-
-        # Check for motion detection
-        motion_detect = foscam_dev_state.find('motionDetectAlarm').text
-        if (last_motion_state == cfg['foscam']['state']['no alarm']) and (
-                motion_detect == cfg['foscam']['state']['alarm']):
-            # Log to Nebula
-            nebula_client.warning('Motion alert!')
-
-            if (time.time() - motion_timer) > cfg['motor']['hysteresis']:
-                nebula_client.debug('New motion detected outside hysteresis interval, starting counter')
-                # Alarm handling
-                if arduino_client.get_value('alarm_mode'):
-                    pushover_client.message('Alarm triggered!', snapshot(), 'GuardHouse Security', 'high', 'alien')
-
                 # Light handling
-                if arduino_client.get_value('day_night'):
-                    # It is dark out so we should turn the light on if...
-                    if not motor_light_state:
-                        # ... it is off
-                        motor_light_state = 1
+                if (time.time() - motion_timer) > cfg['motor']['hysteresis']:
+                    # Last change to light setting was more then the hysteresis limit, so a change is allowed
+                    if motor_light_state:
+                        # There is no motion detected and the light is on so we turn the light off
+                        motor_light_state = 0
                         if arduino_client.set_value('motor_light', motor_light_state):
-                            nebula_client.debug('Wrote \'HIGH\' to \'motor_light\' to the Guard House API')
+                            nebula_client.debug('Wrote \'LOW\' to \'motor_light\' to the Guard House API')
                         else:
                             nebula_client.warning('Failed to write \'motor_light\' to the Guard House API')
-            else:
-                nebula_client.debug('Motion detected within hysteresis interval, resetting counter')
 
-            motion_timer = time.time()
+            last_motion_state = motion_detect
         else:
-            # Light handling
-            if (time.time() - motion_timer) > cfg['motor']['hysteresis']:
-                # Last change to light setting was more then the hysteresis limit, so a change is allowed
-                if motor_light_state:
-                    # There is no motion detected and the light is on so we turn the light off
-                    motor_light_state = 0
-                    if arduino_client.set_value('motor_light', motor_light_state):
-                        nebula_client.debug('Wrote \'LOW\' to \'motor_light\' to the Guard House API')
-                    else:
-                        nebula_client.warning('Failed to write \'motor_light\' to the Guard House API')
-
-        last_motion_state = motion_detect
-
+            time_out = cfg['foscam']['interval']['time-out'];
+            nebula_client.info('Time-out interval changed to: %d seconds' % time_out)
+            cfg['foscam']['motor']['url'] = 'http://192.168.1.81:88/'
 
 def devstate():
     # Read device status
@@ -115,7 +125,7 @@ def devstate():
         payload = {'usr': cfg['foscam']['motor']['user'], 'pwd': cfg['foscam']['motor']['pass'], 'cmd': 'getDevState'}
         r = requests.get(cgi_url, params=payload, timeout=1)
         return ElementTree.fromstring(r.text)  # Extract XML tree
-    except ConnectionError:
+    except (requests.exceptions.ConnectionError, requests.exceptions.ConnectTimeout):
         nebula_client.warning('Unable to read device status [invalid response from Foscam API]')
         return None
 

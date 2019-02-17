@@ -45,11 +45,11 @@ class Client:
             data = requests.get(url).json()
 
             # Store relevant values
-            self.temp = int(data['current_observation']['temp_c'])
-            self.humi = int(data['current_observation']['relative_humidity'])
-            self.wind = int(data['current_observation']['wind_kph'])
-            self.pressure = int(data['current_observation']['pressure_mb'])
-            self.visibility = int(data['current_observation']['visibility_km'])
+            self.temp = float(data['current_observation']['temp_c'])
+            self.humi = float(data['current_observation']['relative_humidity'].strip('%'))
+            self.wind = float(data['current_observation']['wind_kph'])
+            self.pressure = float(data['current_observation']['pressure_mb'])
+            self.visibility = float(data['current_observation']['visibility_km'])
 
             # Return success
             return True
