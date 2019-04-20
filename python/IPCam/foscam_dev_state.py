@@ -2,6 +2,8 @@
 
 # Public pacakages
 import requests
+import datetime
+import traceback
 import re
 import yaml
 import time
@@ -125,7 +127,7 @@ def devstate():
         payload = {'usr': cfg['foscam']['motor']['user'], 'pwd': cfg['foscam']['motor']['pass'], 'cmd': 'getDevState'}
         r = requests.get(cgi_url, params=payload, timeout=1)
         return ElementTree.fromstring(r.text)  # Extract XML tree
-    except (requests.exceptions.ConnectionError, requests.exceptions.ConnectTimeout):
+    except (requests.exceptions.ConnectionError, requests.exceptions.ConnectTimeout, requests.exceptions.ReadTimeout):
         nebula_client.warning('Unable to read device status [invalid response from Foscam API]')
         return None
 
@@ -155,4 +157,9 @@ signal.signal(signal.SIGINT, exit_gracefully)
 signal.signal(signal.SIGTERM, exit_gracefully)
 if __name__ == "__main__":
     print('Foscam and Pushover monitoring scripts activated')
-    main()
+    try:
+        main()
+    except:
+        with open("exceptions.log", "a") as log:
+            log.write("%s: Exception occurred:\n" % datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            traceback.print_exc(file=log)

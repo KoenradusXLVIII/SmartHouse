@@ -1,279 +1,100 @@
-# Public packages
-import os
-import yaml
-from datetime import datetime
+# Public Packages
+from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import calendar
-from sqlalchemy import create_engine
-from sqlalchemy.engine import url
 import pandas as pd
-import numpy as np
 
-# Private packages
-import nebula
+# Private Packages
+# Import Nebula SQLAlchemy database structure
+from nebula_alchemy.base import Session
+from nebula_alchemy.interval import Interval
+from nebula_alchemy.schedule import Schedule
+from nebula_alchemy.algorithm import Algorithm
+from nebula_alchemy.sensor import Sensor
+from nebula_alchemy.quantity import Quantity
+from nebula_alchemy.node import Node
+from nebula_alchemy.user import User
+from nebula_alchemy.meas import Meas
+from nebula_alchemy.processed import Processed
 
+from algorithms import *
 
-def daily_min_mean_max(df_sensors):
-    query = 'SELECT DATE(timestamp) as timestamp, sensors.id as sensor_id, meas.value FROM meas ' \
-            'LEFT JOIN sensors ON meas.sensor_id = sensors.id WHERE sensors.id IN (%s) ' \
-            'AND DATE(timestamp) = DATE(DATE_SUB(NOW(), INTERVAL 1 DAY))' %\
-            ", ".join(map(str, df_sensors['sensor_in_id']))
-    df = pd.read_sql_query(query, con=engine)
-    if not df.empty:
-        nebula_client.info('Daily Min/Mean/Max: %d values to process' % len(df.index))
-
-        # Compute daily Min/Avg/Max
-        df_min = df.groupby(['timestamp', 'sensor_id'], as_index=False).min()
-        df_min['sensor_id'] = df_sensors[df_sensors['sensor_in_id'].
-                                         isin(df_min['sensor_id'].tolist())]['sensor_out_id'].tolist()[0]
-        df_mean = df.groupby(['timestamp', 'sensor_id'], as_index=False).mean()
-        df_mean['sensor_id'] = df_sensors[df_sensors['sensor_in_id'].
-                                          isin(df_mean['sensor_id'].tolist())]['sensor_out_id'].tolist()[1]
-        df_max = df.groupby(['timestamp', 'sensor_id'], as_index=False).max()
-        df_max['sensor_id'] = df_sensors[df_sensors['sensor_in_id'].
-                                         isin(df_max['sensor_id'].tolist())]['sensor_out_id'].tolist()[2]
-
-        # Write processed values to database
-        df_min.to_sql(name='meas', con=engine, if_exists='append', index=False)
-        df_mean.to_sql(name='meas', con=engine, if_exists='append', index=False)
-        df_max.to_sql(name='meas', con=engine, if_exists='append', index=False)
-    else:
-        nebula_client.warning('Daily Min/Mean/Max: no data!')
-
-
-def weekly_min_mean_max(df_sensors):
-    if calendar.day_name[datetime.today().weekday()] == 'Monday':
-        query = 'SELECT WEEK(timestamp) as timestamp, sensors.id as sensor_id, meas.value FROM meas ' \
-                'LEFT JOIN sensors ON meas.sensor_id = sensors.id WHERE sensors.id IN (%s) ' \
-                'AND WEEK(timestamp) = WEEK(DATE_SUB(NOW(), INTERVAL 7 DAY))' %\
-                ", ".join(map(str, df_sensors['sensor_in_id']))
-        df = pd.read_sql_query(query, con=engine)
-        if not df.empty:
-            nebula_client.info('Weekly Min/Mean/Max: %d values to process' % len(df.index))
-
-            # Compute daily Min/Avg/Max
-            df_min = df.groupby(['timestamp', 'sensor_id'], as_index=False).min()
-            df_min['sensor_id'] = df_sensors[df_sensors['sensor_in_id'].
-                                             isin(df_min['sensor_id'].tolist())]['sensor_out_id'].tolist()[0]
-            df_min['timestamp'] = (datetime.now() + relativedelta(days=-7)).strftime("%Y-%m-%d")
-            df_mean = df.groupby(['timestamp', 'sensor_id'], as_index=False).mean()
-            df_mean['sensor_id'] = df_sensors[df_sensors['sensor_in_id'].
-                                              isin(df_mean['sensor_id'].tolist())]['sensor_out_id'].tolist()[1]
-            df_mean['timestamp'] = (datetime.now() + relativedelta(days=-7)).strftime("%Y-%m-%d")
-            df_max = df.groupby(['timestamp', 'sensor_id'], as_index=False).max()
-            df_max['sensor_id'] = df_sensors[df_sensors['sensor_in_id'].
-                                             isin(df_max['sensor_id'].tolist())]['sensor_out_id'].tolist()[2]
-            df_max['timestamp'] = (datetime.now() + relativedelta(days=-7)).strftime("%Y-%m-%d")
-
-            # Write processed values to database
-            df_min.to_sql(name='meas', con=engine, if_exists='append', index=False)
-            df_mean.to_sql(name='meas', con=engine, if_exists='append', index=False)
-            df_max.to_sql(name='meas', con=engine, if_exists='append', index=False)
-        else:
-            nebula_client.warning('Weekly Min/Mean/Max: no data!')
-
-def monthly_min_mean_max(df_sensors):
-    if datetime.today().day == 1:
-        query = 'SELECT MONTH(timestamp) as timestamp, sensors.id as sensor_id, meas.value FROM meas ' \
-                'LEFT JOIN sensors ON meas.sensor_id = sensors.id WHERE sensors.id IN (%s) ' \
-                'AND MONTH(timestamp) = MONTH(DATE_SUB(NOW(), INTERVAL 1 MONTH))' %\
-                ", ".join(map(str, df_sensors['sensor_in_id']))
-        df = pd.read_sql_query(query, con=engine)
-        if not df.empty:
-            nebula_client.info('Monthly Min/Mean/Max: %d values to process' % len(df.index))
-
-            # Compute daily Min/Avg/Max
-            df_min = df.groupby(['timestamp', 'sensor_id'], as_index=False).min()
-            df_min['sensor_id'] = df_sensors[df_sensors['sensor_in_id'].
-                                             isin(df_min['sensor_id'].tolist())]['sensor_out_id'].tolist()[0]
-            df_min['timestamp'] = (datetime.now() + relativedelta(months=-1)).strftime("%Y-%m-%d")
-            df_mean = df.groupby(['timestamp', 'sensor_id'], as_index=False).mean()
-            df_mean['sensor_id'] = df_sensors[df_sensors['sensor_in_id'].
-                                              isin(df_mean['sensor_id'].tolist())]['sensor_out_id'].tolist()[1]
-            df_mean['timestamp'] = (datetime.now() + relativedelta(months=-1)).strftime("%Y-%m-%d")
-            df_max = df.groupby(['timestamp', 'sensor_id'], as_index=False).max()
-            df_max['sensor_id'] = df_sensors[df_sensors['sensor_in_id'].
-                                             isin(df_max['sensor_id'].tolist())]['sensor_out_id'].tolist()[2]
-            df_max['timestamp'] = (datetime.now() + relativedelta(months=-1)).strftime("%Y-%m-%d")
-
-            # Write processed values to database
-            df_min.to_sql(name='meas', con=engine, if_exists='append', index=False)
-            df_mean.to_sql(name='meas', con=engine, if_exists='append', index=False)
-            df_max.to_sql(name='meas', con=engine, if_exists='append', index=False)
-        else:
-            nebula_client.warning('Monthly Min/Mean/Max: no data!')
-
-
-def yearly_min_mean_max(df_sensors):
-    if datetime.today().day == 1 and calendar.month_name[datetime.today().month] == 'January':
-        query = 'SELECT YEAR(timestamp) as timestamp, sensors.id as sensor_id, meas.value FROM meas ' \
-                'LEFT JOIN sensors ON meas.sensor_id = sensors.id WHERE sensors.id IN (%s) ' \
-                'AND YEAR(timestamp) = YEAR(DATE_SUB(NOW(), INTERVAL 1 YEAR))' %\
-                ", ".join(map(str, df_sensors['sensor_in_id']))
-        df = pd.read_sql_query(query, con=engine)
-        if not df.empty:
-            nebula_client.info('Yearly Min/Mean/Max: %d values to process' % len(df.index))
-
-            # Compute daily Min/Avg/Max
-            df_min = df.groupby(['timestamp', 'sensor_id'], as_index=False).min()
-            df_min['sensor_id'] = df_sensors[df_sensors['sensor_in_id'].
-                                             isin(df_min['sensor_id'].tolist())]['sensor_out_id'].tolist()[0]
-            df_min['timestamp'] = (datetime.now() + relativedelta(years=-1)).strftime("%Y-%m-%d")
-            df_mean = df.groupby(['timestamp', 'sensor_id'], as_index=False).mean()
-            df_mean['sensor_id'] = df_sensors[df_sensors['sensor_in_id'].
-                                              isin(df_mean['sensor_id'].tolist())]['sensor_out_id'].tolist()[1]
-            df_mean['timestamp'] = (datetime.now() + relativedelta(years=-1)).strftime("%Y-%m-%d")
-            df_max = df.groupby(['timestamp', 'sensor_id'], as_index=False).max()
-            df_max['sensor_id'] = df_sensors[df_sensors['sensor_in_id'].
-                                             isin(df_max['sensor_id'].tolist())]['sensor_out_id'].tolist()[2]
-            df_max['timestamp'] = (datetime.now() + relativedelta(years=-1)).strftime("%Y-%m-%d")
-
-            # Write processed values to database
-            df_min.to_sql(name='meas', con=engine, if_exists='append', index=False)
-            df_mean.to_sql(name='meas', con=engine, if_exists='append', index=False)
-            df_max.to_sql(name='meas', con=engine, if_exists='append', index=False)
-        else:
-            nebula_client.warning('Yearly Min/Mean/Max: no data!')
-
-
-def daily_sum(df_sensors):
-    query = 'SELECT DATE(timestamp) as timestamp, sensors.id as sensor_id, meas.value FROM meas ' \
-            'LEFT JOIN sensors ON meas.sensor_id = sensors.id WHERE sensors.id IN (%s) ' \
-            'AND DATE(timestamp) = DATE(DATE_SUB(NOW(), INTERVAL 1 DAY))' %\
-            ", ".join(map(str, df_sensors['sensor_in_id']))
-    df = pd.read_sql_query(query, con=engine)
-    if not df.empty:
-        nebula_client.info('Daily sum: %d values to process' % len(df.index))
-
-        # Compute daily sum
-        df_sum = df.groupby(['timestamp', 'sensor_id'], as_index=False).sum()
-        df_sum['sensor_id'] = df_sensors[df_sensors['sensor_in_id'].
-                                         isin(df_sum['sensor_id'].tolist())]['sensor_out_id'].tolist()
-
-        # Write processed values to database
-        df_sum.to_sql(name='meas', con=engine, if_exists='append', index=False)
-    else:
-        nebula_client.warning('Daily sum: no data!')
-
-
-def daily_cum_sum(df_sensors):
-    query = 'SELECT DATE(timestamp) as timestamp, sensors.id as sensor_id, meas.value FROM meas ' \
-            'LEFT JOIN sensors ON meas.sensor_id = sensors.id WHERE sensors.id IN (%s) ' \
-            'AND DATE(timestamp) = DATE(DATE_SUB(NOW(), INTERVAL 1 DAY))' %\
-            ", ".join(map(str, df_sensors['sensor_in_id']))
-    df = pd.read_sql_query(query, con=engine)
-    if not df.empty:
-        nebula_client.info('Daily cumulative sum: %d values to process' % len(df.index))
-
-        # Compute daily sum
-        df_sum = df.groupby(['timestamp', 'sensor_id'], as_index=False).agg(np.ptp)
-        df_sum['sensor_id'] = df_sensors[df_sensors['sensor_in_id'].
-                                         isin(df_sum['sensor_id'].tolist())]['sensor_out_id'].tolist()
-        # Write processed values to database
-        df_sum.to_sql(name='meas', con=engine, if_exists='append', index=False)
-    else:
-        nebula_client.warning('Daily cumulative sum: no data!')
-
-
-def weekly_sum(df_sensors):
-    if calendar.day_name[datetime.today().weekday()] == 'Monday':
-        query = 'SELECT WEEK(timestamp) as timestamp, sensors.id as sensor_id, meas.value FROM meas ' \
-                'LEFT JOIN sensors ON meas.sensor_id = sensors.id WHERE sensors.id IN (%s) ' \
-                'AND WEEK(timestamp) > WEEK(DATE_SUB(NOW(), INTERVAL 7 DAY))' %\
-                ", ".join(map(str, df_sensors['sensor_in_id']))
-        df = pd.read_sql_query(query, con=engine)
-        if not df.empty:
-            nebula_client.info('Weekly sum: %d values to process' % len(df.index))
-
-            # Compute daily sum
-            df_sum = df.groupby(['timestamp', 'sensor_id'], as_index=False).sum()
-            df_sum['sensor_id'] = df_sensors['sensor_id'] = df_sensors[df_sensors['sensor_in_id'].
-                                             isin(df_sum['sensor_id'].tolist())]['sensor_out_id'].tolist()
-            df_sum['timestamp'] = (datetime.now()+relativedelta(days=-7)).strftime("%Y-%m-%d")
-
-            print(df_sum)
-
-            # Write processed values to database
-            df_sum.to_sql(name='meas', con=engine, if_exists='append', index=False)
-        else:
-            nebula_client.warning('Weekly sum: no data!')
-
-
-def monthly_sum(df_sensors):
-    if datetime.today().day == 1:
-        query = 'SELECT MONTH(timestamp) as timestamp, sensors.id as sensor_id, meas.value FROM meas ' \
-                'LEFT JOIN sensors ON meas.sensor_id = sensors.id WHERE sensors.id IN (%s) ' \
-                'AND MONTH(timestamp) = MONTH(DATE_SUB(NOW(), INTERVAL 1 MONTH))' %\
-                ", ".join(map(str, df_sensors['sensor_in_id']))
-        df = pd.read_sql_query(query, con=engine)
-        if not df.empty:
-            nebula_client.info('Monthly sum: %d values to process' % len(df.index))
-
-            # Compute daily sum
-            df_sum = df.groupby(['timestamp', 'sensor_id'], as_index=False).sum()
-            df_sum['sensor_id'] = df_sensors['sensor_id'] = df_sensors[df_sensors['sensor_in_id'].
-                                             isin(df_sum['sensor_id'].tolist())]['sensor_out_id'].tolist()
-            df_sum['timestamp'] = (datetime.now() + relativedelta(months=-1)).strftime("%Y-%m-%d")
-
-            # Write processed values to database
-            df_sum.to_sql(name='meas', con=engine, if_exists='append', index=False)
-        else:
-            nebula_client.warning('Monthly sum: no data!')
-
-
-def yearly_sum(df_sensors):
-    if datetime.today().day == 1 and calendar.month_name[datetime.today().month] == 'January':
-        query = 'SELECT YEAR(timestamp) as timestamp, sensors.id as sensor_id, meas.value FROM meas ' \
-                'LEFT JOIN sensors ON meas.sensor_id = sensors.id WHERE sensors.id IN (%s) ' \
-                'AND YEAR(timestamp) = YEAR(DATE_SUB(NOW(), INTERVAL 1 YEAR))' %\
-                ", ".join(map(str, df_sensors['sensor_in_id']))
-        df = pd.read_sql_query(query, con=engine)
-        if not df.empty:
-            nebula_client.info('Yearly sum: %d values to process' % len(df.index))
-
-            # Compute daily sum
-            df_sum = df.groupby(['timestamp', 'sensor_id'], as_index=False).sum()
-            df_sum['sensor_id'] = df_sensors['sensor_id'] = df_sensors[df_sensors['sensor_in_id'].
-                                             isin(df_sum['sensor_id'].tolist())]['sensor_out_id'].tolist()
-            df_sum['timestamp'] = (datetime.now() + relativedelta(years=-1)).strftime("%Y-%m-%d")
-
-            # Write processed values to database
-            df_sum.to_sql(name='meas', con=engine, if_exists='append', index=False)
-        else:
-            nebula_client.warning('Yearly sum: no data!')
-
-
+# Algorithm map
 algorithm_map = {
-    'daily_cum_sum': daily_cum_sum,
-    'daily_sum': daily_sum,
-    'weekly_sum': weekly_sum,
-    'monthly_sum': monthly_sum,
-    'yearly_sum': yearly_sum,
-    'daily_min_mean_max': daily_min_mean_max,
-    'weekly_min_mean_max': weekly_min_mean_max,
-    'monthly_min_mean_max': monthly_min_mean_max,
-    'yearly_min_mean_max': yearly_min_mean_max
+    'sum': sum,
+    'min': min,
+    'mean': mean,
+    'max': max
 }
 
-# Load configuration YAML
-path = os.path.dirname(os.path.realpath(__file__))
-fp = open(path + '/config.yaml', 'r')
-cfg = yaml.load(fp)
+def process(date_from, date_to, interval_name):
+    schedule = session.query(Schedule) \
+        .join(Interval) \
+        .join(Sensor, Schedule.sensors) \
+        .filter(Interval.name == interval_name)
 
-# Set up Nebula API client
-nebula_client = nebula.Client(**cfg['nebula'])
+    for event in schedule:
+        for sensor in event.sensors:
+            data_query = session.query(Meas) \
+                .join(Sensor) \
+                .filter(Sensor.id == sensor.id) \
+                .filter(Meas.timestamp >= date_from, Meas.timestamp <= date_to) \
+                .statement
+            df = pd.read_sql(data_query, session.bind)
+            value = algorithm_map[event.algorithm.name](df['value'])
+            update = session.query(Processed) \
+                .filter(Processed.sensor_id == sensor.id) \
+                .filter(Processed.timestamp >= date_from, Processed.timestamp <= date_to) \
+                .filter(Processed.algorithm_id == event.algorithm.id) \
+                .filter(Processed.interval_id == event.interval_id) \
+                .first()
+            if update:
+                print('..Update sensor %d - %s / %s %s / %.2f' % (
+                sensor.id, sensor.name, event.interval.name, event.algorithm.name, value))
+                update_entry = session.query(Processed) \
+                    .filter(Processed.sensor_id == sensor.id) \
+                    .filter(Processed.timestamp >= date_from, Processed.timestamp <= date_to) \
+                    .filter(Processed.algorithm_id == event.algorithm.id) \
+                    .filter(Processed.interval_id == event.interval_id) \
+                    .update({'timestamp': date_from, 'value': value})
+            else:
+                print('..Write sensor %d - %s / %s %s / %.2f' % (
+                    sensor.id, sensor.name, event.interval.name, event.algorithm.name, value))
+                processed_value = Processed(date_from, sensor, value, event.interval, event.algorithm)
+                session.add(processed_value)
 
-if __name__ == "__main__":
-    # Connect to MySQL server
-    engine = create_engine(url.URL(**cfg['mysql']))
-    conn = engine.connect()
+# Start a session
+session = Session()
 
-    # Get list of algorithms
-    query = 'SELECT * FROM algorithms'
-    df = pd.read_sql_query(query, con=engine, index_col='id')
+# Run daily queries
+date_from = datetime(datetime.today().year, datetime.today().month, datetime.today().day, 0, 0, 0) + relativedelta(days=-1)
+date_to = datetime(datetime.today().year, datetime.today().month, datetime.today().day, 23, 59, 59) + relativedelta(days=-1)
+process(date_from, date_to, 'Daily')
 
-    for id, row in df.iterrows():
-        query = 'SELECT sensor_in_id, sensor_out_id FROM algorithms_sensors WHERE algorithm_id = %s' % id
-        df = pd.read_sql_query(query, con=engine)
-        if not df.empty:
-            algorithm_map[row['name']](df)
+# Run weekly queries
+if calendar.day_name[datetime.today().weekday()] == 'Monday':
+    date_from = datetime(datetime.today().year, datetime.today().month, datetime.today().day, 0, 0, 0) + \
+        relativedelta(weeks=-1)
+    date_to = datetime(datetime.today().year, datetime.today().month, datetime.today().day, 23, 59, 59) + \
+        relativedelta(days=-1)
+    process(date_from, date_to, 'Weekly')
+
+# Run monthly queries
+if datetime.today().day == 1:
+    date_from = datetime(datetime.today().year, datetime.today().month, datetime.today().day, 0, 0, 0) + \
+        relativedelta(months=-1)
+    date_to = datetime(datetime.today().year, datetime.today().month, datetime.today().day, 23, 59, 59) + \
+        relativedelta(days=-1)
+    process(date_from, date_to, 'Monthly')
+
+# Run yearly queries
+if datetime.today().day == 1 and calendar.month_name[datetime.today().month] == 'January':
+    date_from = datetime(datetime.today().year, datetime.today().month, datetime.today().day, 0, 0, 0) + \
+        relativedelta(years=-1)
+    date_to = datetime(datetime.today().year, datetime.today().month, datetime.today().day, 23, 59, 59) + \
+        relativedelta(days=-1)
+    process(date_from, date_to, 'Yearly')
+
+# Commit and close session
+session.commit()
+session.close()

@@ -56,5 +56,8 @@ class Client:
         except ConnectionError:
             # Return failure
             return False
+        except KeyError:
+            # Retrieved data not valid
+            return False
 
 

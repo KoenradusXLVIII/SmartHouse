@@ -154,9 +154,13 @@ if hour == 6 or force:
         pickle.dump([wu_client.today_high_temperature, wu_client.qpf_allday, qpf_yesterday, lim_days_ahead,
                      sprinkler_mode, sprinkler_duration, sprinkler_times], fp)
 
-with open(path + '/sprinkler.pickle', 'rb') as fp:
-    today_high_temp, qpf_allday, qpf_yesterday, lim_days_ahead, \
-        sprinkler_mode, sprinkler_duration, sprinkler_times = pickle.load(fp)
+try:
+    with open(path + '/sprinkler.pickle', 'rb') as fp:
+        today_high_temp, qpf_allday, qpf_yesterday, lim_days_ahead, \
+            sprinkler_mode, sprinkler_duration, sprinkler_times = pickle.load(fp)
+except FileNotFoundError:
+    # No forecast found
+    sprinkler_times = []
 
 if hour in sprinkler_times:
     if arduino_client.set_value('water_mode', ON):
