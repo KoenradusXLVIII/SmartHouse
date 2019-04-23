@@ -6,18 +6,18 @@
 #include <Crc16.h>
 
 // Pins [Pins 10 through 13 in use by Ethernet shield]
-#define DHT21_PIN 23            // Screw shield A5
-#define DOOR_CONTACT_PIN 25     // Screw shield A4
-#define LIGHT_RELAY_PIN 27      // Screw shield A3
-#define LIGHT_OVERRIDE_PIN 29   // Screw shield A2
-#define VALVE_PIN 31            // Screw shield A1
-#define WATER_OVERRIDE_PIN 33   // Screw shield A0
-#define RAIN_IN_PIN 37          // Screw shield VIN
-#define RAIN_OUT_PIN 39         // Screw shield GND
-#define SHT10_DATA_PIN 41       // Screw shield GND
-#define SHT10_CLK_PIN 43        // Screw shield 5V
-#define LIGHT_SENSOR_PIN 45     // Screw shield 3V3
-#define CHRISTMAS_PIN 47        // Screw shield RESET
+#define DHT21_PIN 23            
+#define DOOR_CONTACT_PIN 25     
+#define LIGHT_RELAY_PIN 27      
+#define LIGHT_OVERRIDE_PIN 29   
+#define VALVE_PIN 31            
+#define WATER_OVERRIDE_PIN 33   
+#define RAIN_IN_PIN 37          
+#define RAIN_OUT_PIN 39         
+#define SHT10_DATA_PIN 41       
+#define SHT10_CLK_PIN 43        
+#define LIGHT_SENSOR_PIN 45
+#define CHRISTMAS_PIN 47        
 
 // Configuration
 #define BUFFER 64
@@ -61,7 +61,7 @@
 byte mac[] = {
   0x90, 0xA2, 0xDA, 0x0E, 0xC5, 0x68
 };
-IPAddress ip(192, 168, 1, 120);
+IPAddress ip(192, 168, 1, 112);
 
 // Initialize the Ethernet server library
 // with the IP address and port you want to use
