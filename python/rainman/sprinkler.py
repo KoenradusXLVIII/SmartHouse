@@ -2,6 +2,7 @@
 import sys
 from time import sleep
 import yaml
+import os
 
 # Private packages
 import arduino
@@ -11,7 +12,8 @@ ON = 0
 OFF = 1
 
 # Load configuration YAML
-fp = open('config.yaml', 'r')
+path = os.path.dirname(os.path.realpath(__file__))
+fp = open(path + '/config.yaml', 'r')
 cfg = yaml.load(fp)
 
 # Set up Nebula API client

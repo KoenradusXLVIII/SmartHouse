@@ -14,35 +14,20 @@ import nebula
 import hue
 
 # Load configuration YAML
-fp = open('config.yaml', 'r')
+path = os.path.dirname(os.path.realpath(__file__))
+fp = open(path + '/config.yaml', 'r')
 cfg = yaml.load(fp)
-
-# Set up IPCam clients
-IPCam_motor = IPCam.Client(**cfg['ipcam']['motor'])
-IPCam_garden = IPCam.Client(**cfg['ipcam']['garden'])
-
-# Set up Pushover client
-pushover_client = pushover.Client(**cfg['pushover'])
-
-# Set up Guard House Arduino client
-arduino_client = arduino.Client(**cfg['guardhouse'])
 
 # Set up Nebula API client
 nebula_client = nebula.Client(**cfg['nebula'])
 nebula_client.set_level(nebula.DEBUG)
-
-# Set up Hue client
-hue_client = hue.Client(**cfg['hue'])
-
-# Local variables
-motor_light_state = 0
 
 # Start deamon
 # PID file location
 if platform.system() == 'Windows':
     pidfile = 'c:\\tmp\\IPCam_daemon.pid'
 elif platform.system() == 'Linux':
-    pidfile = '\tmp\IPCam_daemon.pid'
+    pidfile = '/tmp/IPCam_daemon.pid'
 
 # Check if deamon already running
 if os.path.isfile(pidfile):
@@ -60,10 +45,26 @@ with open(pidfile, 'w') as fp:
     nebula_client.info('Registering IPCam deamon with PID %s' % pid)
     fp.write(pid)
 
+# Set up IPCam clients
+IPCam_motor = IPCam.Client(**cfg['ipcam']['motor'])
+IPCam_garden = IPCam.Client(**cfg['ipcam']['garden'])
+
+# Set up Pushover client
+pushover_client = pushover.Client(**cfg['pushover'])
+
+# Set up Guard House Arduino client
+arduino_client = arduino.Client(**cfg['guardhouse'])
+
+# Set up Hue client
+hue_client = hue.Client(**cfg['hue'])
+
+# Local variables
+motor_light_state = 0
+
 while True:
     # Sleep for x seconds
     time.sleep(cfg['ipcam']['polling'])
-    print('Polling!')
+    #print('Polling!')
 
     # Check for day/night transitions
     night = IPCam_motor.day_night()
