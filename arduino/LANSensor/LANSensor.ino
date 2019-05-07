@@ -57,17 +57,14 @@
 #define DAY_NIGHT 12
 #define STROBE 13
 
-// Enter a MAC address and IP address for your controller below.
-// The IP address will be dependent on your local network:
-byte mac[] = {
-  0x90, 0xA2, 0xDA, 0x0E, 0xC5, 0x68
-};
-IPAddress ip(192, 168, 1, 112);
-
-// Initialize the Ethernet server library
-// with the IP address and port you want to use
-// (port 80 is default for HTTP):
+// Initialize local server instance
+byte mac[] = {0x90, 0xA2, 0xDA, 0x0E, 0xC5, 0x68};
+IPAddress ip(192, 168, 1, 120);
 EthernetServer server(80);
+
+// Initialize client connection(s)
+IPAddress overhang_ip(192, 168, 0, 111);
+
 // '{"VAR_NAME":VAR_VALUE,"VAR_NAME":VAR_VALUE,...,"VAR_NAME":VAR_VALUE}\0'
 char charResponse[1+VAR_COUNT*(1+VAR_NAME_MAX_LENGTH+1+1+VAR_VALUE_MAX_LENGTH+1)-1+1+1];
 char charCommand[VAR_NAME_MAX_LENGTH+VAR_VALUE_MAX_LENGTH+1] = "";
@@ -84,17 +81,6 @@ dht DHT;
 
 // JSON library
 Json json;
-
-// Serial variables
-char charSerial[SERIAL_BUFFER] = "";
-char charSerial1[SERIAL_BUFFER] = "";
-Crc16 crc;
-char charCrc[CRC_LENGTH+1] = "0000";
-bool boolCrc;
-const char charMotorLightOn[] = "motor_light/1";
-const char charMotorLightOff[] = "motor_light/0";
-const char charStrobeOn[] = "strobe/1";
-const char charStrobeOff[] = "strobe/0";
 
 // Define variables
   const char var_array[VAR_COUNT][VAR_NAME_MAX_LENGTH] =
@@ -126,7 +112,6 @@ const char charStrobeOff[] = "strobe/0";
 
 void setup() {
   Serial.begin(9600);
-  Serial1.begin(4800);
 
   // Initialze pins
   pinMode(DOOR_CONTACT_PIN,INPUT);
@@ -188,32 +173,22 @@ void loop() {
   prev_day_night_state = value_array[DAY_NIGHT];
 
   // Motor light
-  if((value_array[MOTOR_LIGHT] == OFF) && (prev_motor_light_state == ON)) {
-    if (!sendCrc(charMotorLightOff, true)) {
+  if(value_array[MOTOR_LIGHT] != prev_motor_light_state) {
+    if (!ether_set(MOTOR_LIGHT, overhang_ip)) {
       // Failed to transmit data to Overhang, reset local representation
-      value_array[MOTOR_LIGHT] = ON;
+      value_array[MOTOR_LIGHT] = !value_array[MOTOR_LIGHT];
     }
-  } else if ((value_array[MOTOR_LIGHT] == ON) && (prev_motor_light_state == OFF)) {
-    if (!sendCrc(charMotorLightOn, true)) {
-      // Failed to transmit data to Overhang, reset local representation
-      value_array[MOTOR_LIGHT] = OFF;
-    }
-  }    
+  }
   prev_motor_light_state = value_array[MOTOR_LIGHT];  
 
   // Strobe
-  if((value_array[STROBE] == OFF) && (prev_strobe_state == ON)) {
-    if (!sendCrc(charStrobeOff, true)) {
+  if(value_array[STROBE] != prev_strobe_state) {
+    if (!ether_set(STROBE, overhang_ip)) {
       // Failed to transmit data to Overhang, reset local representation
-      value_array[STROBE] = ON;
+      value_array[STROBE] = !value_array[STROBE];
     }
-  } else if ((value_array[STROBE] == ON) && (prev_strobe_state == OFF)) {
-    if (!sendCrc(charStrobeOn, true)) {
-      // Failed to transmit data to Overhang, reset local representation
-      value_array[STROBE] = OFF;
-    }
-  }    
-  prev_strobe_state = value_array[STROBE];    
+  }
+  prev_strobe_state = value_array[STROBE];  
 
   // Soil moisture sensor
   value_array[SOIL_HUMI] = sht10.readHumidity();
@@ -289,11 +264,6 @@ void loop() {
     delay(1);
     // close the connection:
     client.stop();
-  }
-
-  // Process serial clients
-  {
-    // TODO
   }
 }
 
@@ -466,94 +436,52 @@ void return_all() {
   strcat(charResponse,"}");
 }
 
-bool recCrc(bool boolAck) {
-  crc.clearCrc();                   // Reset CRC
-  boolCrc = false;
-  int i = 0;
-  while (Serial1.available()) {     // Read from serial interface
-    char c = Serial1.read();
-    if (c == '!') {                 // Start of CRC detected
-      charSerial[i] = '\0';
-      boolCrc = true;
-      i = 0;
-      c = Serial1.read();
-    }
-    if (!boolCrc) {
-      charSerial[i++] = c;   
-      crc.updateCrc(c);             // Update CRC
-    } else {
-      charCrc[i++] = c;  
-    }
-    delay(10);   
-  }  
+bool ether_set(int var_id, IPAddress * ip) {
+  EthernetClient set_client;
+  bool ret = false;
+  int intValue; 
+  
+  if (set_client.connect(ip, 80)) {
+    // Make a HTTP request
+    set_client.print("GET /");
+    set_client.print(var_array[var_id]);
+    set_client.print("/");
+    set_client.println(value_array[var_id]);
+    set_client.println("Connection: close");
+    set_client.println();
 
-  // Process inbound message
-  if (strlen(charSerial)) {         // New message detected
-    if (boolAck) {                  // Acknowledgement required
-      if (checkCrc()) {             // Check CRC
-        sendCrc("OK", false);       // Cyclic redundancy check OK, send without expecting acknowledgement
-        charSerial[0] = '\0';       // Reset serial buffer
-        return true;                 
-      } else { 
-        sendCrc("NOK", false);      // Cyclic redundancy check NOK, send without expecting acknowledgement
-        charSerial[0] = '\0';
-        return false;
-      }
-    } else {                        // No acknowledgement required
-      return checkCrc();            // Verify CRC
-    }   
-  }
-}
-
-bool checkCrc() {
-  unsigned short recCrc = 0;
-  for (int i=0; i < CRC_LENGTH; i++) {
-    int digit = (charCrc[i] >= 'A') ? charCrc[i] - 'A' + 10 : charCrc[i] - '0';
-    recCrc = recCrc + (digit << (4 * (CRC_LENGTH-1-i)));
-  } 
-  return (recCrc == crc.getCrc());
-}
-
-bool sendCrc(char * msg, bool boolAck) {
-  unsigned short value = crc.XModemCrc(msg,0,strlen(msg));
-
-  // Debug
-  Serial.print("Message: ");
-  Serial.print(msg);
-  Serial.print(" - ");
-
-  // Send message with CRC
-  Serial1.print(msg);
-  Serial1.print('!');
-  Serial1.print(value, HEX);
-
-  // Wait for acknowledgement?
-  if (boolAck) {
-    unsigned long start_time = millis();
-    unsigned long cur_time = start_time;
-    for (int itt = 0; itt < SERIAL_RETRIES; itt++) {
-      Serial.print(itt);
-      while ((cur_time - start_time) < SERIAL_TIMEOUT) {        
-        // Wait for acknowledgement until timeout
-        if (Serial1.available()) {
-          // Ready to receive acknowledgement  
-          if (recCrc(false)) {
-            // Acknowledgement received
-            Serial.println("");
-            return true;
-          } else {
-            // CRC error occured, resend...
-            Serial1.print(msg);
-            Serial1.print('!');
-            Serial1.print(value, HEX);
-            break;
-          }
+    // Process response
+    char charReadLine[MAX_LINE_LENGTH];
+    int i = 0;
+    char c;
+    while (set_client.available()) {
+        // Store the HTTP request line
+        c = set_client.read();
+        if (i < MAX_LINE_LENGTH) {
+          charReadLine[i] = c;
+          charReadLine[i+1] = '\0';
         }
-        cur_time = millis();
-      }
-      // Timeout!
-      start_time = millis();  
+        i++;
     }
-    return false;
-  }          
+
+    Serial.print("Server responded: ");
+    Serial.println(charReadLine);
+    sscanf(charReadLine,"{\"%*s\":%d.%*d}", &intValue);
+    if (intValue == int(value_array[var_id])) {
+      // Succesfully set variable via ethernet
+      ret = true;
+    } else {
+      // Variable not succesfully set
+      ret = false;
+    }
+
+    // Close connection
+    set_client.stop();
+    
+  } else {
+    Serial.println("Connection failed");
+  }
+
+  // Return response
+  return ret;
 }
