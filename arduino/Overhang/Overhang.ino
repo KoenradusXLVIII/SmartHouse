@@ -35,6 +35,7 @@ const char var_array[VAR_COUNT][VAR_NAME_MAX_LENGTH] =
 float value_array[VAR_COUNT] = {OFF, OFF};
 
 int prev_motor_light_state = OFF;     // Default to off
+int prev_strobe_state = OFF;          // Default to off
 
 void setup() {
   Serial.begin(4800);
@@ -52,12 +53,19 @@ void loop() {
   // Receive any inbound messages
   recCrc(true);
 
+  // Strobe
+  if((value_array[STROBE] == OFF) && (prev_strobe_state == ON))
+    digitalWrite(STROBE_PIN, LOW);
+  else if ((value_array[STROBE] == ON) && (prev_strobe_state == OFF))
+    digitalWrite(STROBE_PIN, HIGH);
+  prev_strobe_state = value_array[STROBE]; 
+
   // Motor light
   if((value_array[MOTOR_LIGHT] == OFF) && (prev_motor_light_state == ON))
     digitalWrite(MOTOR_LIGHT_PIN, LOW);
   else if ((value_array[MOTOR_LIGHT] == ON) && (prev_motor_light_state == OFF))
     digitalWrite(MOTOR_LIGHT_PIN, HIGH);
-  prev_motor_light_state = value_array[MOTOR_LIGHT]; 
+  prev_motor_light_state = value_array[MOTOR_LIGHT];   
 }
 
 bool recCrc(bool boolAck) {

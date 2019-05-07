@@ -39,7 +39,7 @@ pushover_client = pushover.Client(**cfg['pushover'])
 nebula_client = nebula.Client(**cfg['nebula'])
 
 # Set up Logger and attach Pushover client
-log_client = logger.Client(name='pvoutput')
+log_client = logger.Client(name='pvoutput', log_level='warning')
 if debug:
     log_client.set_log_level('debug')
 log_client.attach_pushover(pushover_client)

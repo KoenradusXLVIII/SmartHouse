@@ -21,30 +21,61 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-#ifndef Json_h
-#define Json_h
 
 #include "Arduino.h"
+#include "Json.h"
 
-#define VAR_NAME_MAX_LENGTH 16 // Keep the '\0' in mind!
-#define VAR_VALUE_MAX_LENGTH 12 // Keep the '\0' in mind!
-
-class Json
+Json::Json()
 {
-  public:
-    Json(); // Constructor
-    void parse_command(char * charCommand);
-    char get_cmd_type(void);
-    char * get_var_name(void);
-    float get_var_value(void);
-    void set_var_value(float floatSetValue);
-    char * get_response(void);
-  private:
-    char charCmdType;
-    char charName[VAR_NAME_MAX_LENGTH];
-    float floatValue;
-    char charValue[VAR_VALUE_MAX_LENGTH];
-    char charResponse[VAR_NAME_MAX_LENGTH+VAR_VALUE_MAX_LENGTH+1];
-};
+  // Constructor is empty
+}
 
-#endif
+void Json::parse_command(char * charCommand)
+{
+  // Intialise variables
+  int intValue;  
+  charCmdType = 'G';     // Default to GET command
+  strcpy(charName, charCommand);
+
+  for (int i = 0; i < strlen(charCommand); i++ ){
+    if (charCommand[i] == '/') { // Command contains '/', so this is a SET command
+      charCmdType = 'S';
+      charCommand[i] = ' ';
+      sscanf(charCommand,"%s %d", charName, &intValue);
+      floatValue = (float)intValue;
+      dtostrf(floatValue, 3, 2, charValue);
+      break;
+    } 
+  }
+}
+
+char Json::get_cmd_type(void)
+{
+  return charCmdType;
+}
+
+char * Json::get_var_name(void)
+{
+  return charName;
+}
+
+float Json::get_var_value(void)
+{
+  return floatValue;
+}
+
+void Json::set_var_value(float floatSetValue)
+{
+  floatValue = floatSetValue;
+  dtostrf(floatValue, 3, 2, charValue);
+}
+
+char * Json::get_response(void)
+{ 
+  strcpy(charResponse, "{\"");
+  strcat(charResponse, charName);
+  strcat(charResponse, "\":");
+  strcat(charResponse, charValue);
+  strcat(charResponse, "}");
+  return charResponse;
+}

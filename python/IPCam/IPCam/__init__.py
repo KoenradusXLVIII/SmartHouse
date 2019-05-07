@@ -49,29 +49,30 @@ class Client:
 
     def motion_detect(self):
         data = self._get_devstate()
-        if data.find('motionDetectAlarm').text == '1':
-            self.last_motion_state = False
-            return False
-        elif data.find('motionDetectAlarm').text == '2':
-            # Motion detected
-            if not self.last_motion_state:
-                # New motion detected
-                self.last_motion_state = True
-                if self.motion_timeout():
-                    # New motion detected outside hysteresis window
-                    self._last_motion_time = time.time()
-                    return True
-                else:
-                    # New motion detected inside hysteresis window, reset time
-                    self._last_motion_time = time.time()
-                    print('Reset')
-                    return False
-            else:
-                # Only report new motions
+        if data is not None:
+            if data.find('motionDetectAlarm').text == '1':
+                self.last_motion_state = False
                 return False
-        else:
-            # Unknown state
-            return None
+            elif data.find('motionDetectAlarm').text == '2':
+                # Motion detected
+                if not self.last_motion_state:
+                    # New motion detected
+                    self.last_motion_state = True
+                    if self.motion_timeout():
+                        # New motion detected outside hysteresis window
+                        self._last_motion_time = time.time()
+                        return True
+                    else:
+                        # New motion detected inside hysteresis window, reset time
+                        self._last_motion_time = time.time()
+                        print('Reset')
+                        return False
+                else:
+                    # Only report new motions
+                    return False
+
+        # Unknown state
+        return None
 
     def motion_timeout(self):
         return (time.time() - self._last_motion_time) > self.motion_hysteresis

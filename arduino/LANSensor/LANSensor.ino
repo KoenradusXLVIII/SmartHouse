@@ -2,7 +2,7 @@
 #include <Ethernet.h>
 #include <dht.h>
 #include <SHT1x.h>
-#include "Json.h"
+#include <Json.h>
 #include <Crc16.h>
 
 // Pins [Pins 10 through 13 in use by Ethernet shield]
@@ -22,7 +22,7 @@
 // Configuration
 #define BUFFER 64
 #define RAIN_CALIBRATION 3 // ml/pulse
-#define VAR_COUNT 13
+#define VAR_COUNT 14
 #define MAX_LINE_LENGTH 200
 #define SERIAL_BUFFER 32
 #define CRC_LENGTH 4 // 16 bits, encoded in HEX
@@ -55,6 +55,7 @@
 #define WATER_MODE 10
 #define MOTOR_LIGHT 11
 #define DAY_NIGHT 12
+#define STROBE 13
 
 // Enter a MAC address and IP address for your controller below.
 // The IP address will be dependent on your local network:
@@ -69,7 +70,7 @@ IPAddress ip(192, 168, 1, 112);
 EthernetServer server(80);
 // '{"VAR_NAME":VAR_VALUE,"VAR_NAME":VAR_VALUE,...,"VAR_NAME":VAR_VALUE}\0'
 char charResponse[1+VAR_COUNT*(1+VAR_NAME_MAX_LENGTH+1+1+VAR_VALUE_MAX_LENGTH+1)-1+1+1];
-char charCommand[VAR_NAME_MAX_LENGTH+VAR_VALUE_MAX_LENGTH+1] = "test_data";
+char charCommand[VAR_NAME_MAX_LENGTH+VAR_VALUE_MAX_LENGTH+1] = "";
  
 // Initialize SHT10
 // VCC - Brown - Red
@@ -92,14 +93,16 @@ char charCrc[CRC_LENGTH+1] = "0000";
 bool boolCrc;
 const char charMotorLightOn[] = "motor_light/1";
 const char charMotorLightOff[] = "motor_light/0";
+const char charStrobeOn[] = "strobe/1";
+const char charStrobeOff[] = "strobe/0";
 
 // Define variables
   const char var_array[VAR_COUNT][VAR_NAME_MAX_LENGTH] =
    {"temp", "humi", "rain", "soil_humi", "door_state", 
     "light_state", "light_delay", "valve_state", 
     "alarm_mode", "light_mode", "water_mode",
-    "motor_light", "day_night"};
-  float value_array[VAR_COUNT] = {0, 0, 0, 0, CLOSED, OFF, 30000, CLOSED, ON, AUTO, AUTO, OFF, DAY};
+    "motor_light", "day_night", "strobe"};
+  float value_array[VAR_COUNT] = {0, 0, 0, 0, CLOSED, OFF, 30000, CLOSED, ON, AUTO, AUTO, OFF, DAY, OFF};
   const char charInvalid[] PROGMEM = "Invalid parameter";
 
   // DHT21 value buffer
@@ -109,7 +112,10 @@ const char charMotorLightOff[] = "motor_light/0";
   // Digital I/O variables
   int prev_door_state = CLOSED;         // Default to closed
   int prev_day_night_state = DAY;       // Default to day
+
+  // Virtual I/O variables
   int prev_motor_light_state = OFF;     // Default to off
+  int prev_strobe_state = OFF;          // Default to off  
 
   // Timers
   bool timer_on = false;                // Default timer off
@@ -157,17 +163,7 @@ void setup() {
   Serial.println(F("[DONE]"));
 }
 
-void loop() {
-  // Manage serial communication to Overhang
-  /*if (Serial1.available()) {
-    int i = 0;
-    while (Serial1.available()) {
-      charSerial[i++] = Serial1.read();;
-    }
-    charSerial[i] = '\0';
-    Serial.print(charSerial);
-  }*/
-  
+void loop() { 
   // Get new filtered DHT21 values
   value_array[TEMP] = read_filtered_DHT(buf_temp,TEMP);
   value_array[HUMI] = read_filtered_DHT(buf_humi,HUMI);
@@ -204,6 +200,20 @@ void loop() {
     }
   }    
   prev_motor_light_state = value_array[MOTOR_LIGHT];  
+
+  // Strobe
+  if((value_array[STROBE] == OFF) && (prev_strobe_state == ON)) {
+    if (!sendCrc(charStrobeOff, true)) {
+      // Failed to transmit data to Overhang, reset local representation
+      value_array[STROBE] = ON;
+    }
+  } else if ((value_array[STROBE] == ON) && (prev_strobe_state == OFF)) {
+    if (!sendCrc(charStrobeOn, true)) {
+      // Failed to transmit data to Overhang, reset local representation
+      value_array[STROBE] = OFF;
+    }
+  }    
+  prev_strobe_state = value_array[STROBE];    
 
   // Soil moisture sensor
   value_array[SOIL_HUMI] = sht10.readHumidity();
