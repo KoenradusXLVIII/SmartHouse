@@ -12,7 +12,7 @@
 
 // WiFi server configuration
 #define MAX_LINE_LENGTH 200
-IPAddress ip(192, 168, 1, 111);
+IPAddress ip(192, 168, 1, 120);
 IPAddress gateway(192, 168, 1, 1);
 IPAddress subnet(255, 255, 255, 0);
 char ssid[] = WIFI_SSID;
