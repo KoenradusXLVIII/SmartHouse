@@ -18,6 +18,7 @@ cfg = yaml.load(fp)
 
 # Set up Nebula API client
 nebula_client = nebula.Client(**cfg['nebula'])
+nebula_client.set_level('WARNING')
 
 # Set up Guard House Arduino client
 arduino_client = arduino.Client(**cfg['guardhouse'])
