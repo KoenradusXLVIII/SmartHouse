@@ -1,6 +1,12 @@
+// Public libraries
 #include <ESP8266WiFi.h>
 #include <OneWire.h>
+
+// Private libraries
 #include <Json.h>
+#include <Numpy.h>
+
+// Local includes
 #include "config.h"
 
 // Aliases
@@ -20,8 +26,8 @@ WiFiServer server(80);
 // WiFi client configuration
 const char* host = "http://www.joostverberk.nl";
 const uint16_t port = 80;
-const long nebulaInterval = 5*60*1000;                      // Update Nebula every 5 minutes          
-unsigned long previousNebula = millis() + nebulaInterval;   // Update on boot   
+const long nebulaInterval = 1*60*1000;                      // Update Nebula every 5 minutes          
+unsigned long previousNebula = 0;
 
 // Blink configuration
 const int blinkPin =  LED_BUILTIN; 
@@ -40,18 +46,25 @@ float value_array[VAR_COUNT] = {5.0};
 int sensor_id_array[VAR_COUNT] = {85};
 Json json;
 
-// OneWire DS18S20, DS18B20, DS1822 Temperature Example
+// DS18B20
+#define BUF_LENGTH 32
 OneWire  ds(D2);  // on pin D2
 byte addr[8] = {0x28, 0xE0, 0xC4, 0x19, 0x17, 0x13, 0x01, 0x76};
-float calibration = 2.50;
+float calibration = 2.0;
+float buf_temp[BUF_LENGTH];
+
+// Numpy
+Numpy np;
 
 void setup() {
   Serial.begin(9600);
 
-  // Connect to WiFi network
-  Serial.print(F("Connecting to "));
-  Serial.println(ssid);
+  // Report SSID
+  Serial.print(F("Connecting to: "));
+  Serial.print(ssid);
+  Serial.print(F(" "));
 
+  // Connect to WiFi network
   WiFi.mode(WIFI_STA);
   WiFi.config(ip, gateway, subnet, dns);
   WiFi.begin(ssid, pass);
@@ -60,15 +73,14 @@ void setup() {
     delay(500);
     Serial.print(F("."));
   }
-  Serial.println();
-  Serial.println(F("WiFi connected"));
+
+  // Report the IP address
+  Serial.println(F(""));
+  Serial.print(F("IP Address: "));
+  Serial.println(WiFi.localIP());
 
   // Start the server
   server.begin();
-  Serial.println(F("Server started"));
-
-  // Print the IP address
-  Serial.println(WiFi.localIP());
 
   // Set I/O
   pinMode(blinkPin, OUTPUT);
@@ -76,7 +88,7 @@ void setup() {
 
 void loop() {
   // DS18B20 handling
-  value_array[TEMP] = DS18B20(addr);
+  value_array[TEMP] = read_filtered_DS18B20(buf_temp, BUF_LENGTH, addr);
 
   // Nebula handling
   unsigned long currentNebula = millis();
@@ -103,9 +115,10 @@ void loop() {
 }
 
 void handle_Nebula() {
+  Serial.println("Nebula upload");
   
+  // Define variables
   WiFiClient client;
-  client.connect(host, port);
   
   // Compute content length
   int content_length = 2; // {\n
@@ -119,25 +132,35 @@ void handle_Nebula() {
   content_length += 3;    // }]\n
   content_length += 3;    // }\n
 
-  client.println("POST /api/graph/post_test.php HTTP/1.1");
-  client.println("Host: joostverberk.nl");
-  client.println("Content-Type: application/x-www-form-urlencoded");
-  client.print("Content-Length: ");
+  // Connect to Nebula
+  client.connect(host, port);
+
+  // Send POST message
+  // Send message header
+  client.println(F("POST /api/graph/post.php HTTP/1.1"));
+  client.println(F("Host: joostverberk.nl"));
+  client.println(F("Content-Type: application/x-www-form-urlencoded"));
+  client.println(F("User-Agent: Arduino/1.0"));
+  client.println(F("Connection: close"));
+  // Send computed content-length
+  client.print(F("Content-Length: "));
   client.println(content_length);
-  client.println("Connection: close");
-  client.println("");
-  client.println("{");
-  client.print("\"api_key\":\"");
+  client.println(F(""));
+
+  // Send message body
+  client.println(F("{"));
+  client.print(F("\"api_key\":\""));
   client.print(NEBULA_API_KEY);
-  client.println("\",");
-  client.print("\"values\":[{\"sensor_id\":");
+  client.println(F("\","));
+  client.print(F("\"values\":[{\"sensor_id\":"));
   client.print(sensor_id_array[TEMP]);
-  client.print(",\"value\":");
+  client.print(F(",\"value\":"));
   client.print(value_array[TEMP]);
-  client.println("}]");
-  client.println("}");
-  client.println("");
-  
+  client.println(F("}]"));
+  client.println(F("}"));
+  client.println(F(""));
+
+  // Close connection to Nebula
   client.stop();
 }
 
@@ -150,7 +173,6 @@ void handle_JSON_server(void) {
     boolean currentLineIsBlank = true;
     int i = 0;
     char c;
-    //Serial.println("New client connected");
 
     while (client.connected()) {
       if (client.available()) {
@@ -213,10 +235,20 @@ void handle_JSON_server(void) {
   }
 }
 
-float DS18B20(byte * addr){
- byte i;
- byte present = 0;
- byte type_s;
+float read_filtered_DS18B20(float *buf_data, int buf_length, byte *addr) {
+  // Shift buffer
+  for (int n = (buf_length - 1); n > 0; n--) {
+    buf_data[n] = buf_data[n - 1];
+  }
+
+  // Append new data
+  buf_data[0] = _DS18B20_read(addr);
+
+  // Return filtered mean (1 stdev)
+  return np.filt_mean(buf_data, buf_length, 1);
+}
+
+float _DS18B20_read(byte * addr){
  byte data[12];
  float celsius;
 
@@ -229,7 +261,7 @@ float DS18B20(byte * addr){
  ds.select(addr);
  ds.write(0xBE); // Read scratchpad
 
- for (i=0; i<9; i++) {
+ for (int i=0; i<9; i++) {
   data[i] = ds.read();
  }
 
