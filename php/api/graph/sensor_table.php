@@ -21,7 +21,7 @@
             <div class="row">
         	    <div class="col-md-10">
                     <h2>Sensors</h2>
-                    [<a href="intraday.php">Intraday</a>] [<a href="nodes.php">Nodes</a>] [<a href="sensor_table.php">Sensors</a>]<br /><br />
+                    [<a href="intraday.php">Intraday</a>] [<a href="nodes.php">Nodes</a>] [<a href="sensor_table.php">Sensors</a>] [<a href="trail_table.php">Trail</a>]<br /><br />
                     <div class="table-responsive">
                         <table id="sensors" class="table table-striped table-bordered">
                           <thead>
@@ -47,7 +47,6 @@
                                 $result = $db->query($query);
                                 
                                 // Loop through the returned data
-                                $data = array();
                                 if($result) {
                                     foreach ($result as $row) {
         	                            // Query database

@@ -10,6 +10,7 @@
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-multiselect/0.9.15/css/bootstrap-multiselect.css" integrity="sha256-7stu7f6AB+1rx5IqD8I+XuIcK4gSnpeGeSjqsODU+Rk=" crossorigin="anonymous" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.8.0/css/bootstrap-datepicker.css" integrity="sha256-9w7XtQnqRDvThmsQHfLmXdDbGasYsSjF6FSXrDh7F6g=" crossorigin="anonymous" />
         <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css"  integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+        <link rel="icon" href="favicon.ico" type="image/x-icon" />
         <style type="text/css">
           body {
             padding-top: 20px;
@@ -33,7 +34,7 @@
             <div class="row">
         	    <div class="col-md-10">
                     <h2>Intraday</h2>
-                    [<a href="intraday.php">Intraday</a>] [<a href="nodes.php">Nodes</a>] [<a href="sensor_table.php">Sensors</a>]<br /><br />
+                    [<a href="intraday.php">Intraday</a>] [<a href="nodes.php">Nodes</a>] [<a href="sensor_table.php">Sensors</a>] [<a href="trail_table.php">Trail</a>]<br /><br />
                     <b>Personal views</b><br />
                     <select id='ViewDropdown' onchange='viewChange()' style='border-width:0px'>
                     </select>&nbsp;&nbsp;
@@ -166,7 +167,7 @@
             });
             
             $('#datepicker').on('changeDate', function() {
-                updateGraph();    
+                viewChange();    
             });
             
             function viewDelete() {

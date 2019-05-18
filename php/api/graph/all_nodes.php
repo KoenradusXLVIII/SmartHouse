@@ -20,12 +20,13 @@
 	    <div class="container">
             <div class="row">
         	    <div class="col-md-10">
-                    <h2>Nodes</h2>
+                    <h2>All SensorNodes</h2>
                     [<a href="intraday.php">Intraday</a>] [<a href="nodes.php">Nodes</a>] [<a href="sensor_table.php">Sensors</a>] [<a href="trail_table.php">Trail</a>]<br /><br />
                     <div class="table-responsive">
                         <table id="nodes" class="table table-striped table-bordered">
                           <thead>
                             <tr>
+                              <th>User</th>
                               <th>Name</th>
                               <th>UUID</th>
                               <th>Status</th>
@@ -42,18 +43,19 @@
                                 $db = $database->getConnection();
                                 
                                 // Query database
-                                $query = "SELECT * FROM nodes WHERE user_id = '" . $_SESSION['user_id'] . "' ORDER BY name ASC";
+                                $query = "SELECT * FROM nodes ORDER BY name ASC";
                                 $result = $db->query($query);
                                 
                                 // Loop through the returned data
                                 if($result) {
                                     foreach ($result as $node) {
                                         // Query database
-                                        $query = "SELECT nodes.id, nodes.name, meas.timestamp FROM nodes LEFT JOIN sensors ON sensors.node_id = nodes.id LEFT JOIN meas ON meas.sensor_id = sensors.id WHERE node_id = '" . $node['id'] ."' ORDER BY timestamp DESC LIMIT 1";
+                                        $query = "SELECT users.name AS user, nodes.id, nodes.name, meas.timestamp FROM nodes LEFT JOIN users ON users.id = nodes.user_id LEFT JOIN sensors ON sensors.node_id = nodes.id LEFT JOIN meas ON meas.sensor_id = sensors.id WHERE node_id = '" . $node['id'] ."' ORDER BY timestamp DESC LIMIT 1";
                                         $result = $db->query($query);
                                         $row = $result->fetch_assoc();
                                         
                                         echo "<tr>";
+                                        echo "<td>" . ucfirst($row['user'])  . "</td>";
                                         echo "<td>" . $row['name']  . "</td>";
                                         echo "<td>" . $row['id']  . "</td>";
                                         if (strtotime($row['timestamp']) <= strtotime('-10 minutes')) {

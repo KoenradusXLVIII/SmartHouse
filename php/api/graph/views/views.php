@@ -62,7 +62,7 @@
         }         
     } elseif($_POST["method"]=="ALL") {
         // Query database
-        $query = "SELECT id, name FROM views WHERE user_id='" . $_POST["user_id"] . "'";
+        $query = "SELECT id, name FROM views WHERE user_id='" . $_POST["user_id"] . "' ORDER BY favourite DESC, name ASC";
         $result = $db->query($query);
         
         // Loop through the returned data

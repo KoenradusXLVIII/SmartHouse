@@ -20,7 +20,7 @@ $query = $query . "WHERE DATE(timestamp) = '" . $_POST["graph_date"] . "' AND me
 foreach ($_POST["sensors"] as $sensor) {
     $query = $query . $sensor . ",";
 }
-$query = rtrim($query, ',') . ") AND timestamp >= NOW() - INTERVAL 2 DAY ORDER BY timestamp ASC";
+$query = rtrim($query, ',') . ") ORDER BY timestamp ASC";
 $result = $db->query($query);
 
 // Loop through the returned data
