@@ -13,7 +13,7 @@ import nebula
 import arduino
 import pushover
 from diff import dx, dxdt
-import wunderground
+import openweathermap
 
 # Check command line parameters
 local = False  # Upload to PVOutput
@@ -55,8 +55,8 @@ p1_client = P1.Client('/dev/ttyUSB0')
 if debug:
     p1_client.attach_logger(log_client)
 
-# Set up Weather Underground client
-wu_client = wunderground.Client(**cfg['WU'])
+# Set up OpenWeatherMap
+owm_client = openweathermap.Client(**cfg['OWM'])
 
 
 def main():
@@ -154,13 +154,12 @@ def main():
             '19': data_guardhouse['motor_light'],                       # Motor Light [On/Off]
             '20': data_guardhouse['day_night'],                         # Time of Day [Day/Night]
         })
-    if wu_client.conditions():
+    if owm_client.weather():
         payload.update({
-            '80': wu_client.temp,
-            '81': wu_client.humi,
-            '82': wu_client.wind,
-            '83': wu_client.pressure,
-            '84': wu_client.visibility
+            '80': owm_client.temp,
+            '81': owm_client.humidity,
+            '82': owm_client.wind,
+            '83': owm_client.pressure
         })
 
     # Post Nebula payload

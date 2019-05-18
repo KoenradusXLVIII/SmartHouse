@@ -1,13 +1,11 @@
-// Public libraries
-#include <ESP8266WiFi.h>
-#include <OneWire.h>
-
 // Private libraries
 #include <Json.h>
-#include <Numpy.h>
 
 // Local includes
 #include "config.h"
+
+// Debug
+#define DEBUG 1
 
 // Aliases
 #define OFF 0
@@ -15,10 +13,6 @@
 
 // WiFi server configuration
 #define MAX_LINE_LENGTH 200
-IPAddress ip(192, 168, 1, 120);
-IPAddress gateway(192, 168, 1, 1);
-IPAddress subnet(255, 255, 255, 0);
-IPAddress dns(8, 8 , 8, 8);
 char ssid[] = WIFI_SSID;
 char pass[] = WIFI_PASSWD;
 WiFiServer server(80);
@@ -36,25 +30,28 @@ unsigned long previousBlink = 0;
 int blinkState = LOW;  
 
 // JSON Interface
-#define VAR_COUNT 1
-#define TEMP 0
+#define VAR_COUNT 4
+#define SPRINKLER_BACK 0
+#define SPRINKLER_FRONT 1
+#define RELAY_3 2
+#define RELAY_4 3
 char charResponse[1 + VAR_COUNT * (1 + VAR_NAME_MAX_LENGTH + 1 + 1 + VAR_VALUE_MAX_LENGTH + 1) - 1 + 1 + 1];
 char charCommand[VAR_NAME_MAX_LENGTH + VAR_VALUE_MAX_LENGTH + 1] = "";
 const char charInvalid[] PROGMEM = "Invalid parameter";
-const char var_array[VAR_COUNT][VAR_NAME_MAX_LENGTH] = {"temp"};
-float value_array[VAR_COUNT] = {5.0};
-int sensor_id_array[VAR_COUNT] = {85};
+const char var_array[VAR_COUNT][VAR_NAME_MAX_LENGTH] = {"sprinkler_front", "sprinkler_back", "relay_3", "relay_4"};
+float value_array[VAR_COUNT] = {ON, OFF, ON, OFF};
+int sensor_id_array[VAR_COUNT] = {87, 86, 88, 89};
 Json json;
 
-// DS18B20
-#define BUF_LENGTH 32
-OneWire  ds(D2);  // on pin D2
-byte addr[8] = {0x28, 0xE0, 0xC4, 0x19, 0x17, 0x13, 0x01, 0x76};
-float calibration = 2.0;
-float buf_temp[BUF_LENGTH];
-
-// Numpy
-Numpy np;
+// I/O Variables
+#define SPRINKLER_BACK_PIN D0
+#define SPRINKLER_FRONT_PIN D1
+#define RELAY_3_PIN D2
+#define RELAY_4_PIN D3
+int prev_sprinkler_front_state = value_array[SPRINKLER_FRONT];          
+int prev_sprinkler_back_state = value_array[SPRINKLER_BACK];          
+int prev_relay_3_state = value_array[RELAY_3];                   
+int prev_relay_4_state = value_array[RELAY_4];                 
 
 void setup() {
   Serial.begin(9600);
@@ -82,21 +79,21 @@ void setup() {
   // Start the server
   server.begin();
 
-  // Set I/O
+  // Initialze pins
   pinMode(blinkPin, OUTPUT);
+  pinMode(SPRINKLER_BACK_PIN, OUTPUT);
+  pinMode(SPRINKLER_FRONT_PIN, OUTPUT);
+  pinMode(RELAY_3_PIN, OUTPUT);
+  pinMode(RELAY_4_PIN, OUTPUT);
+
+    // Initialize output pin values
+  digitalWrite(SPRINKLER_BACK_PIN, !value_array[SPRINKLER_BACK]);  
+  digitalWrite(SPRINKLER_FRONT_PIN, !value_array[SPRINKLER_FRONT]);  
+  digitalWrite(RELAY_3_PIN, !value_array[RELAY_3]);
+  digitalWrite(RELAY_4_PIN, !value_array[RELAY_4]);  
 }
 
 void loop() {
-  // DS18B20 handling
-  value_array[TEMP] = read_filtered_DS18B20(buf_temp, BUF_LENGTH, addr);
-
-  // Nebula handling
-  unsigned long currentNebula = millis();
-  if (currentNebula - previousNebula >= nebulaInterval) {
-    previousNebula = currentNebula;
-    handle_Nebula();
-  }
-
   // Blink handling
   unsigned long currentBlink = millis();
   if (currentBlink - previousBlink >= blinkInterval) {
@@ -107,8 +104,28 @@ void loop() {
     } else {
       blinkState = LOW;
     }
-    
     digitalWrite(blinkPin, blinkState);
+  }
+
+  // IO handling
+  if (value_array[SPRINKLER_BACK] != prev_sprinkler_back_state)
+    digitalWrite(SPRINKLER_BACK_PIN, !value_array[SPRINKLER_BACK]);
+  prev_sprinkler_back_state = value_array[SPRINKLER_BACK];
+  if (value_array[SPRINKLER_FRONT] != prev_sprinkler_front_state)
+    digitalWrite(SPRINKLER_FRONT_PIN, !value_array[SPRINKLER_FRONT]);
+  prev_sprinkler_front_state = value_array[SPRINKLER_FRONT];
+  if (value_array[RELAY_3] != prev_relay_3_state)
+    digitalWrite(RELAY_3_PIN, !value_array[RELAY_3]);
+  prev_relay_3_state = value_array[RELAY_3];
+  if (value_array[RELAY_4] != prev_relay_4_state)
+    digitalWrite(RELAY_4_PIN, !value_array[RELAY_4]);
+  prev_relay_4_state = value_array[RELAY_4];
+  
+  // Nebula handling
+  unsigned long currentNebula = millis();
+  if (currentNebula - previousNebula >= nebulaInterval) {
+    previousNebula = currentNebula;
+    handle_Nebula();
   }
   
   // JSON server handling
@@ -123,13 +140,35 @@ void handle_Nebula() {
   int content_length = 2; // {\n
   content_length += 11;   // "api_key":"
   content_length += sizeof(NEBULA_API_KEY);
-  content_length += 3;    // ",\n
-  content_length += 23;   // "values":[{"sensor_id":
+  content_length += 4;    // ",\r\n
+  content_length += 9;    // "values":
+  content_length += 3;    // [\r\n
+  content_length += 13;   // {"sensor_id":
   content_length += 2;    // xx
   content_length += 9;    // ,"value":
-  content_length += 5;    // xx.xx
-  content_length += 3;    // }]\n
-  content_length += 3;    // }\n
+  content_length += 4;    // x.xx
+  content_length += 1;    // }
+  content_length += 3;    // ,\r\n
+  content_length += 13;   // {"sensor_id":
+  content_length += 2;    // xx
+  content_length += 9;    // ,"value":
+  content_length += 4;    // x.xx
+  content_length += 1;    // }
+  content_length += 3;    // ,\r\n
+  content_length += 13;   // {"sensor_id":
+  content_length += 2;    // xx
+  content_length += 9;    // ,"value":
+  content_length += 4;    // x.xx
+  content_length += 1;    // }
+  content_length += 3;    // ,\r\n
+  content_length += 13;   // {"sensor_id":
+  content_length += 2;    // xx
+  content_length += 9;    // ,"value":
+  content_length += 4;    // x.xx
+  content_length += 3;    // }\r\n
+  content_length += 3;    // ]\r\n
+  content_length += 3;    // }\r\n
+  content_length += 2;    // \r\n
 
   // Connect to Nebula
   client.connect(host, port);
@@ -151,14 +190,89 @@ void handle_Nebula() {
   client.print(F("\"api_key\":\""));
   client.print(NEBULA_API_KEY);
   client.println(F("\","));
-  client.print(F("\"values\":[{\"sensor_id\":"));
-  client.print(sensor_id_array[TEMP]);
+  client.print(F("\"values\":"));
+  client.println(F("["));
+  client.print(F("{\"sensor_id\":"));
+  client.print(sensor_id_array[SPRINKLER_BACK]);
   client.print(F(",\"value\":"));
-  client.print(value_array[TEMP]);
-  client.println(F("}]"));
+  client.print(value_array[SPRINKLER_BACK]);
+  client.print(F("}"));
+  client.println(F(","));
+  client.print(F("{\"sensor_id\":"));
+  client.print(sensor_id_array[SPRINKLER_FRONT]);
+  client.print(F(",\"value\":"));
+  client.print(value_array[SPRINKLER_FRONT]);
+  client.print(F("}"));
+  client.println(F(","));
+  client.print(F("{\"sensor_id\":"));
+  client.print(sensor_id_array[RELAY_3]);
+  client.print(F(",\"value\":"));
+  client.print(value_array[RELAY_3]);
+  client.print(F("}"));
+  client.println(F(","));
+  client.print(F("{\"sensor_id\":"));
+  client.print(sensor_id_array[RELAY_4]);
+  client.print(F(",\"value\":"));
+  client.print(value_array[RELAY_4]);
+  client.println(F("}"));
+  client.println(F("]"));
   client.println(F("}"));
   client.println(F(""));
 
+  if (DEBUG) {
+    Serial.println(F("{"));
+    Serial.print(F("\"api_key\":\""));
+    Serial.print(NEBULA_API_KEY);
+    Serial.println(F("\","));
+    Serial.print(F("\"values\":"));
+    Serial.println(F("["));
+    Serial.print(F("{\"sensor_id\":"));
+    Serial.print(sensor_id_array[SPRINKLER_BACK]);
+    Serial.print(F(",\"value\":"));
+    Serial.print(value_array[SPRINKLER_BACK]);
+    Serial.print(F("}"));
+    Serial.println(F(","));
+    Serial.print(F("{\"sensor_id\":"));
+    Serial.print(sensor_id_array[SPRINKLER_FRONT]);
+    Serial.print(F(",\"value\":"));
+    Serial.print(value_array[SPRINKLER_FRONT]);
+    Serial.print(F("}"));
+    Serial.println(F(","));
+    Serial.print(F("{\"sensor_id\":"));
+    Serial.print(sensor_id_array[RELAY_3]);
+    Serial.print(F(",\"value\":"));
+    Serial.print(value_array[RELAY_3]);
+    Serial.print(F("}"));
+    Serial.println(F(","));
+    Serial.print(F("{\"sensor_id\":"));
+    Serial.print(sensor_id_array[RELAY_4]);
+    Serial.print(F(",\"value\":"));
+    Serial.print(value_array[RELAY_4]);
+    Serial.println(F("}"));
+    Serial.println(F("]"));
+    Serial.println(F("}"));
+    Serial.println(F(""));
+
+    // wait for data to be available
+    unsigned long timeout = millis();
+    while (client.available() == 0) {
+      if (millis() - timeout > 5000) {
+        Serial.println(">>> Client Timeout !");
+        client.stop();
+        delay(60000);
+        return;
+      }
+    }
+
+    // Read all the lines of the reply from server and print them to Serial
+    Serial.println("receiving from remote server");
+    // not testing 'client.connected()' since we do not need to send data here
+    while (client.available()) {
+      char ch = static_cast<char>(client.read());
+      Serial.print(ch);
+    }
+  }
+  
   // Close connection to Nebula
   client.stop();
 }
@@ -189,8 +303,8 @@ void handle_JSON_server(void) {
         if (c == '\n' && currentLineIsBlank) {
           // Parse command
           if (strlen(charCommand)) {
-            //Serial.print("End of HTTP request, processing charCommand: ");
-            //Serial.println(charCommand);
+            //client.print("End of HTTP request, processing charCommand: ");
+            //client.println(charCommand);
             parse_command(charCommand);
           }
 
@@ -210,7 +324,7 @@ void handle_JSON_server(void) {
               // GET command received, stripping...
               // From the front: "GET /" - 5 characters
               // From the back: " HTTP/1.1" - 9 charachters
-              //Serial.print(charReadLine);
+              //client.print(charReadLine);
               strncpy(charCommand, &charReadLine[5], strlen(charReadLine) - 16);
               charCommand[strlen(charReadLine) - 16] = '\0';
             } else {
@@ -234,44 +348,6 @@ void handle_JSON_server(void) {
   }
 }
 
-float read_filtered_DS18B20(float *buf_data, int buf_length, byte *addr) {
-  // Shift buffer
-  for (int n = (buf_length - 1); n > 0; n--) {
-    buf_data[n] = buf_data[n - 1];
-  }
-
-  // Append new data
-  buf_data[0] = _DS18B20_read(addr);
-
-  // Return filtered mean (1 stdev)
-  return np.filt_mean(buf_data, buf_length, 1);
-}
-
-float _DS18B20_read(byte * addr){
- byte data[12];
- float celsius;
-
- ds.reset();
- ds.select(addr);
- ds.write(0x44, 1); // Start conversion
- delay(1000);
-
- ds.reset();
- ds.select(addr);
- ds.write(0xBE); // Read scratchpad
-
- for (int i=0; i<9; i++) {
-  data[i] = ds.read();
- }
-
- OneWire::crc8(data,8);
- 
- int16_t raw = (data[1] << 8) | data[0];
- celsius = (float)raw / 16.0;
-
- return celsius-calibration;
-}
-
 void parse_command(char * command)
 {
   float var_value;
@@ -285,16 +361,16 @@ void parse_command(char * command)
     // Single parameter requested
     // Verify if it is valid
     int id = get_id_from_name(json.get_var_name());
-    //Serial.print("GET: ");
-    //Serial.println(json.get_var_name());     
+    //client.print("GET: ");
+    //client.println(json.get_var_name());     
     if (id == -1) {
       // Invalid parameter received
       strcpy(charResponse,charInvalid);
     } else {
       if (json.get_cmd_type()== 'G'){
         // Retrieve value from array
-        //Serial.print("GET: ");
-        //Serial.println(id); 
+        //client.print("GET: ");
+        //client.println(id); 
         var_value = value_array[id];
         // Write to JSON parser
         json.set_var_value(var_value);
