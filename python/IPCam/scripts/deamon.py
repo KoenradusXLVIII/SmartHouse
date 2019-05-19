@@ -20,7 +20,7 @@ cfg = yaml.load(fp)
 
 # Set up Nebula API client
 nebula_client = nebula.Client(**cfg['nebula'])
-nebula_client.set_level(nebula.DEBUG)
+nebula_client.set_level(nebula.INFO)
 
 # Start deamon
 # PID file location
@@ -53,7 +53,7 @@ IPCam_garden = IPCam.Client(**cfg['ipcam']['garden'])
 pushover_client = pushover.Client(**cfg['pushover'])
 
 # Set up Guard House Arduino client
-arduino_client = arduino.Client(**cfg['guardhouse'])
+arduino_client = arduino.Client(**cfg['arduino'])
 
 # Set up Hue client
 hue_client = hue.Client(**cfg['hue'])

@@ -151,7 +151,6 @@ def main():
             '16': data_guardhouse['alarm_mode'],                        # Alarm Mode [On/Off]
             '17': data_guardhouse['light_mode'],                        # Light Mode [Auto/Manual]
             '18': data_guardhouse['water_mode'],                        # Water Mode [Auto/Manual]
-            '19': data_guardhouse['motor_light'],                       # Motor Light [On/Off]
             '20': data_guardhouse['day_night'],                         # Time of Day [Day/Night]
         })
     if owm_client.weather():

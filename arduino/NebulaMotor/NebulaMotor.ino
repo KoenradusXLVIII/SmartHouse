@@ -5,6 +5,7 @@
 // Private libraries
 #include <Json.h>
 #include <Numpy.h>
+#include <Nebula.h>
 
 // Local includes
 #include "config.h"
@@ -12,6 +13,8 @@
 // Aliases
 #define OFF 0
 #define ON 1
+#define DAY 0
+#define NIGHT 1
 
 // WiFi server configuration
 #define MAX_LINE_LENGTH 200
@@ -19,38 +22,31 @@ char ssid[] = WIFI_SSID;
 char pass[] = WIFI_PASSWD;
 WiFiServer server(80);
 
-// WiFi client configuration
-const char* host = "http://www.joostverberk.nl";
-const uint16_t port = 80;
-const long nebulaInterval = 5*60*1000;                      // Update Nebula every 5 minutes          
-unsigned long previousNebula = 0;
-
 // Blink configuration
-const int blinkPin =  LED_BUILTIN; 
-const long blinkInterval = 1000;                            // Blink every second         
-unsigned long previousBlink = 0;     
-int blinkState = LOW;  
+const int blinkPin =  LED_BUILTIN;
+const long blinkInterval = 1000;              // Blink every second
+unsigned long previousBlink = 0;
 
 // JSON Interface
-#define VAR_COUNT 1
-#define TEMP 0
+#define VAR_COUNT 3
 char charResponse[1 + VAR_COUNT * (1 + VAR_NAME_MAX_LENGTH + 1 + 1 + VAR_VALUE_MAX_LENGTH + 1) - 1 + 1 + 1];
 char charCommand[VAR_NAME_MAX_LENGTH + VAR_VALUE_MAX_LENGTH + 1] = "";
 const char charInvalid[] PROGMEM = "Invalid parameter";
-const char var_array[VAR_COUNT][VAR_NAME_MAX_LENGTH] = {"temp"};
-float value_array[VAR_COUNT] = {5.0};
-int sensor_id_array[VAR_COUNT] = {85};
+
+// Local variable definition
+// ! Put the local IO last !
+const char var_array[VAR_COUNT][VAR_NAME_MAX_LENGTH] = {"day_night", "motor_light", "strobe"};
+float value_array[VAR_COUNT] = {DAY, OFF, OFF};
+int sensor_id_array[VAR_COUNT] = {20, 19, 90};
 Json json;
 
-// DS18B20
-#define BUF_LENGTH 32
-OneWire  ds(D2);  // on pin D2
-byte addr[8] = {0x28, 0xE0, 0xC4, 0x19, 0x17, 0x13, 0x01, 0x76};
-float calibration = 2.0;
-float buf_temp[BUF_LENGTH];
+// I/O Variables 
+#define IO_START 1
+int IO_pin_array[VAR_COUNT] = {D0, D1};
 
-// Numpy
-Numpy np;
+// WiFi client configuration
+#define UPLOAD_RATE 5
+Nebula nebula(NEBULA_API_KEY, UPLOAD_RATE, VAR_COUNT);
 
 void setup() {
   Serial.begin(9600);
@@ -80,83 +76,32 @@ void setup() {
 
   // Set I/O
   pinMode(blinkPin, OUTPUT);
+  for (int i = IO_START; i < VAR_COUNT; i++) {
+    pinMode(IO_pin_array[i - IO_START], OUTPUT);
+    digitalWrite(IO_pin_array[i - IO_START], !value_array[i]);
+  }
 }
 
 void loop() {
-  // DS18B20 handling
-  value_array[TEMP] = read_filtered_DS18B20(buf_temp, BUF_LENGTH, addr);
-
-  // Nebula handling
-  unsigned long currentNebula = millis();
-  if (currentNebula - previousNebula >= nebulaInterval) {
-    previousNebula = currentNebula;
-    handle_Nebula();
-  }
 
   // Blink handling
   unsigned long currentBlink = millis();
   if (currentBlink - previousBlink >= blinkInterval) {
     previousBlink = currentBlink;
-    // if the LED is off turn it on and vice-versa:
-    if (blinkState == LOW) {
-      blinkState = HIGH;
-    } else {
-      blinkState = LOW;
-    }
-    
-    digitalWrite(blinkPin, blinkState);
+    digitalWrite(blinkPin, !digitalRead(blinkPin));
   }
-  
+
+  // IO handling
+  for (int i = IO_START; i < VAR_COUNT; i++) {
+    if (value_array[i] != digitalRead(IO_pin_array[i-IO_START]))
+      digitalWrite(IO_pin_array[i-IO_START], value_array[i]); 
+  }
+    
+  // Nebula handling
+  nebula.update(sensor_id_array, value_array);
+
   // JSON server handling
   handle_JSON_server();
-}
-
-void handle_Nebula() {  
-  // Define variables
-  WiFiClient client;
-  
-  // Compute content length
-  int content_length = 2; // {\n
-  content_length += 11;   // "api_key":"
-  content_length += sizeof(NEBULA_API_KEY);
-  content_length += 3;    // ",\n
-  content_length += 23;   // "values":[{"sensor_id":
-  content_length += 2;    // xx
-  content_length += 9;    // ,"value":
-  content_length += 5;    // xx.xx
-  content_length += 3;    // }]\n
-  content_length += 3;    // }\n
-
-  // Connect to Nebula
-  client.connect(host, port);
-
-  // Send POST message
-  // Send message header
-  client.println(F("POST /api/graph/post.php HTTP/1.1"));
-  client.println(F("Host: joostverberk.nl"));
-  client.println(F("Content-Type: application/x-www-form-urlencoded"));
-  client.println(F("User-Agent: Arduino/1.0"));
-  client.println(F("Connection: close"));
-  // Send computed content-length
-  client.print(F("Content-Length: "));
-  client.println(content_length);
-  client.println(F(""));
-
-  // Send message body
-  client.println(F("{"));
-  client.print(F("\"api_key\":\""));
-  client.print(NEBULA_API_KEY);
-  client.println(F("\","));
-  client.print(F("\"values\":[{\"sensor_id\":"));
-  client.print(sensor_id_array[TEMP]);
-  client.print(F(",\"value\":"));
-  client.print(value_array[TEMP]);
-  client.println(F("}]"));
-  client.println(F("}"));
-  client.println(F(""));
-
-  // Close connection to Nebula
-  client.stop();
 }
 
 void handle_JSON_server(void) {
@@ -230,51 +175,13 @@ void handle_JSON_server(void) {
   }
 }
 
-float read_filtered_DS18B20(float *buf_data, int buf_length, byte *addr) {
-  // Shift buffer
-  for (int n = (buf_length - 1); n > 0; n--) {
-    buf_data[n] = buf_data[n - 1];
-  }
-
-  // Append new data
-  buf_data[0] = _DS18B20_read(addr);
-
-  // Return filtered mean (1 stdev)
-  return np.filt_mean(buf_data, buf_length, 1);
-}
-
-float _DS18B20_read(byte * addr){
- byte data[12];
- float celsius;
-
- ds.reset();
- ds.select(addr);
- ds.write(0x44, 1); // Start conversion
- delay(1000);
-
- ds.reset();
- ds.select(addr);
- ds.write(0xBE); // Read scratchpad
-
- for (int i=0; i<9; i++) {
-  data[i] = ds.read();
- }
-
- OneWire::crc8(data,8);
- 
- int16_t raw = (data[1] << 8) | data[0];
- celsius = (float)raw / 16.0;
-
- return celsius-calibration;
-}
-
 void parse_command(char * command)
 {
   float var_value;
 
   json.parse_command(command);
 
-  if (strcmp(json.get_var_name(),"all")==0) {
+  if (strcmp(json.get_var_name(), "all") == 0) {
     // All parameters requested
     return_all();
   } else {
@@ -282,15 +189,15 @@ void parse_command(char * command)
     // Verify if it is valid
     int id = get_id_from_name(json.get_var_name());
     //Serial.print("GET: ");
-    //Serial.println(json.get_var_name());     
+    //Serial.println(json.get_var_name());
     if (id == -1) {
       // Invalid parameter received
-      strcpy(charResponse,charInvalid);
+      strcpy(charResponse, charInvalid);
     } else {
-      if (json.get_cmd_type()== 'G'){
+      if (json.get_cmd_type() == 'G') {
         // Retrieve value from array
         //Serial.print("GET: ");
-        //Serial.println(id); 
+        //Serial.println(id);
         var_value = value_array[id];
         // Write to JSON parser
         json.set_var_value(var_value);
@@ -298,14 +205,14 @@ void parse_command(char * command)
         // Write value to array
         value_array[id] = json.get_var_value();;
       }
-      strcpy(charResponse,json.get_response());
+      strcpy(charResponse, json.get_response());
     }
   }
 }
 
-int get_id_from_name(char * var_name){
-  for (int i = 0; i < VAR_COUNT; i++ ){
-    if(strcmp(var_array[i],var_name) == 0)
+int get_id_from_name(char * var_name) {
+  for (int i = 0; i < VAR_COUNT; i++ ) {
+    if (strcmp(var_array[i], var_name) == 0)
       return i;
   }
   return -1;
@@ -314,15 +221,15 @@ int get_id_from_name(char * var_name){
 void return_all() {
   // Initialize variables
   char charValue[VAR_VALUE_MAX_LENGTH];
-  
+
   strcpy(charResponse, "{\"");
-  for (int i = 0; i < VAR_COUNT; i++ ){
+  for (int i = 0; i < VAR_COUNT; i++ ) {
     strcat(charResponse, var_array[i]);
     strcat(charResponse, "\":");
     dtostrf(value_array[i], 3, 2, charValue);
     strcat(charResponse, charValue);
     if (i < (VAR_COUNT - 1))
-      strcat(charResponse, ",\""); 
+      strcat(charResponse, ",\"");
   }
-  strcat(charResponse,"}");
+  strcat(charResponse, "}");
 }
