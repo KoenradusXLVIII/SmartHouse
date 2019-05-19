@@ -21,3 +21,6 @@ arduino/ReadNUID/ReadNUID.ino
 *.ppk
 python/testvenv/
 config.h
+*test*
+*.ico
+python/random/
