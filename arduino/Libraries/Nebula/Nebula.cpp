@@ -25,10 +25,12 @@ SOFTWARE.
 #include "Arduino.h"
 #include "Nebula.h"
 
-Nebula::Nebula(char * APIKey, unsigned long uploadInterval, int nrVariables) // Constructor
+Nebula::Nebula(char * APIKey, char * NodeUUID, unsigned long uploadInterval, int nrVariables) // Constructor
 {
   strcpy(_APIKey, APIKey);
   _APIKey[36] = '\0';
+  strcpy(_NodeUUID, NodeUUID);
+  _NodeUUID[36] = '\0';
   _uploadInterval = uploadInterval*60*1000;
   _nrVariables = nrVariables;
 }
@@ -42,17 +44,66 @@ bool Nebula::update(int * sensor_id_array, float * value_array)
   unsigned long now = millis();
   if (now - _previousUpload >= _uploadInterval) {
     _previousUpload = now;
-    upload(sensor_id_array, value_array);
+    upload_data(sensor_id_array, value_array);
     return true;
   }    
   return false;
+}
+
+void Nebula::connect(IPAddress ip, String mac)
+{
+    // Instantiate WiFi client
+    WiFiClient client;
+    client.connect(HOST, PORT);
+    
+    // Compute IP address length
+    int ip_length = 0;
+    for (int i = 0; i < 4; i++) {
+        ip_length += 1;
+        if (ip[i] > 9) {
+            ip_length += 1;
+            if (ip[i] > 99)
+                ip_length += 1;
+        }
+    } 
+    
+    Serial.print("ip length: ");
+    Serial.println(ip_length);
+    
+    // Send POST message
+    // Send message header
+    client.println(F("POST /api/graph/node.php HTTP/1.1"));
+    client.println(F("Host: joostverberk.nl"));
+    client.println(F("Content-Type: application/json"));
+    client.println(F("User-Agent: Wemos/1.0"));
+    client.println(F("Connection: close"));
+    client.print(F("Content-Length: "));
+    client.println(150+ip_length);
+    client.println(F(""));   
+
+    // Send message body
+    client.println(F("{"));
+    client.print(F("\"api_key\":\""));
+    client.print(_APIKey);
+    client.println(F("\","));
+    client.print(F("\"node_uuid\":\""));
+    client.print(_NodeUUID);
+    client.println(F("\","));
+    client.print(F("\"ip\":\""));
+    client.print(ip);
+    client.println(F("\","));
+    client.print(F("\"mac\":\""));
+    client.print(mac);
+    client.println(F("\""));    
+    client.println(F("}"));
+    client.println(F(""));          
 }
 
 //
 // Private functions
 //
 
-void Nebula::upload(int * sensor_id_array, float * value_array)
+void Nebula::upload_data(int * sensor_id_array, float * value_array)
 {
     // Instantiate WiFi client
     WiFiClient client;
@@ -62,9 +113,9 @@ void Nebula::upload(int * sensor_id_array, float * value_array)
     // Send message header
     client.println(F("POST /api/graph/post.php HTTP/1.1"));
     client.println(F("Host: joostverberk.nl"));
-    client.println(F("Content-Type: application/x-www-form-urlencoded"));
+    client.println(F("Content-Type: application/json"));
     client.println(F("User-Agent: Wemos/1.0"));
-    client.println(F("Connection: close"));
+    Serial.println(F("Connection: close"));
     client.print(F("Content-Length: "));
     client.println(content_length());
     client.println(F(""));
@@ -94,7 +145,7 @@ void Nebula::upload(int * sensor_id_array, float * value_array)
     // Send message header
     Serial.println(F("POST /api/graph/post.php HTTP/1.1"));
     Serial.println(F("Host: joostverberk.nl"));
-    Serial.println(F("Content-Type: application/x-www-form-urlencoded"));
+    Serial.println(F("Content-Type: application/json"));
     Serial.println(F("User-Agent: Wemos/1.0"));
     Serial.println(F("Connection: close"));
     Serial.print(F("Content-Length: "));

@@ -33,16 +33,18 @@ SOFTWARE.
 class Nebula
 {
   public:
-    Nebula(char * APIKey, unsigned long uploadInterval, int nrVariables); // Constructor
+    Nebula(char * APIKey, char * NodeUUID, unsigned long uploadInterval, int nrVariables); // Constructor
     bool update(int * sensor_id_array, float * value_array);
+    void connect(IPAddress ip, String mac);
   private:
     // Functions
-    void upload(int * sensor_id_array, float * value_array);
+    void upload_data(int * sensor_id_array, float * value_array);
     int content_length(void);
     // Variables
     unsigned long _previousUpload = 0;
     unsigned long _uploadInterval;
     char _APIKey[37];
+    char _NodeUUID[37];
     int _nrVariables;
 };
 

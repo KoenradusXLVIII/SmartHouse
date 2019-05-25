@@ -21,8 +21,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-#ifndef Json_h
-#define Json_h
+#ifndef JSON_h
+#define JSON_h
 
 #include "Arduino.h"
 
@@ -36,9 +36,9 @@ class Json
   public:
     Json(int intVarCount);  // Constructor
     void process(char * charJsonInput, char * charJsonOutput, const char charVarNames[][VAR_NAME_MAX_LENGTH], float * floatVarValues);
+    int get_id_from_name(char * charVarName, const char charVarNames[][VAR_NAME_MAX_LENGTH]);
   private:
     // Functions
-    int get_id_from_name(char * charVarName, const char charVarNames[][VAR_NAME_MAX_LENGTH]);
     void parse_all(char * charJsonOutput, const char charVarNames[][VAR_NAME_MAX_LENGTH], float * floatVarValues); 
     void parse_single(char * charJsonOutput, const char charVarNames[][VAR_NAME_MAX_LENGTH], float * floatVarValues, int intVarId);    
     // Variables
