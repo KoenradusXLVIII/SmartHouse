@@ -38,8 +38,6 @@ class Client:
                 self.forecast(itt)
             else:
                 return False
-        #except KeyError:
-        #    return False
 
     def weather(self, itt=0):
         url = self._base_url + 'weather?q=' + self.city + '&appid=' + self.api_key

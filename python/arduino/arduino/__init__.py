@@ -10,8 +10,12 @@ class Client:
     def get_value(self, var, itt = 0):
         url = self.url + var.lower()
         try:
-            r = requests.get(url, timeout=self.timeout).json()
-            return float(r[var.lower()])
+            r = requests.get(url, timeout=self.timeout)
+            if r.status_code == 200:
+                r = r.json()
+                return float(r[var.lower()])
+            else:
+                return None
         except (requests.exceptions.ConnectionError, requests.exceptions.ConnectTimeout):
             itt += 1
             if itt < self.retries:
@@ -22,8 +26,12 @@ class Client:
     def get_all(self, itt=0):
         url = self.url + 'all'
         try:
-            r = requests.get(url, timeout=self.timeout).json()
-            return r
+            r = requests.get(url, timeout=self.timeout)
+            if r.status_code == 200:
+                r = r.json()
+                return r
+            else:
+                return None
         except (requests.exceptions.ConnectionError, requests.exceptions.ConnectTimeout):
             itt += 1
             if itt < self.retries:
@@ -34,11 +42,16 @@ class Client:
     def set_value(self, var, value, itt = 0):
         url = self.url + var.lower() + '/' + str(value)
         try:
-            r = requests.get(url, timeout=self.timeout).json()
-            if float(r[var.lower()]) == float(value):
-                return True
+            r = requests.get(url, timeout=self.timeout)
+            if r.status_code == 200:
+                r = r.json()
+                if float(r[var.lower()]) == float(value):
+                    return True
+                else:
+                    return None
             else:
                 return None
+
         except (requests.exceptions.ConnectionError, requests.exceptions.ConnectTimeout):
             itt += 1
             if itt < self.retries:

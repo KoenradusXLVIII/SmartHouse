@@ -63,68 +63,72 @@ motor_light_state = 0
 strobe_state = 0
 
 while True:
-    # Sleep for x seconds
-    time.sleep(cfg['ipcam']['polling'])
-    #print('Polling!')
+    try:
+        # Sleep for x seconds
+        time.sleep(cfg['ipcam']['polling'])
+        #print('Polling!')
 
-    # Check for day/night transitions
-    night = IPCam_motor.day_night()
-    if night is not None:
-        if arduino_client.set_value('day_night', night):
-            if night:
-                nebula_client.info('Transition to night written to Wemos Motor')
-                # If no one home turns lights on in 'not home' mode
-                if hue_client.get_all_off():
-                    hue_client.set_scene('Not home')
-                    nebula_client.info('Switching lights on to \'Not home\' mode')
-            else:  # If not night, then day
-                nebula_client.info('Transition to day written to Wemos Motor')
-        else:
-            nebula_client.warning('Failed to write \'day_night\' to Wemos Motor')
-
-    # Check for new motion at Motor IPCam
-    if IPCam_motor.motion_detect():
-        # Alarm handling
-        # print('Alarm')
-        pushover_client.message('Alarm triggered!', IPCam_motor.snapshot(), 'GuardHouse Security', 'high', 'alien')
-
-        # Strobe handling
-        if not strobe_state:
-            strobe_state = 1
-            if arduino_client.set_value('strobe', strobe_state):
-                nebula_client.debug('Wrote \'HIGH\' to \'strobe\' to Wemos Motor')
+        # Check for day/night transitions
+        night = IPCam_motor.day_night()
+        if night is not None:
+            if arduino_client.set_value('day_night', night):
+                if night:
+                    nebula_client.info('Transition to night written to Wemos Motor')
+                    # If no one home turns lights on in 'not home' mode
+                    if hue_client.get_all_off():
+                        hue_client.set_scene('Not home')
+                        nebula_client.info('Switching lights on to \'Not home\' mode')
+                else:  # If not night, then day
+                    nebula_client.info('Transition to day written to Wemos Motor')
             else:
-                nebula_client.warning('Failed to write \'strobe\' to Wemos Motor')
+                nebula_client.warning('Failed to write \'day_night\' to Wemos Motor')
 
-        # Light handling
-        if arduino_client.get_value('day_night'):
-            # It is dark out so we should turn the light on if...
-            if not motor_light_state:
-                # ... it is off
-                motor_light_state = 1
-                if arduino_client.set_value('motor_light', motor_light_state):
-                    nebula_client.debug('Wrote \'HIGH\' to \'motor_light\' to Wemos Motor')
-                else:
-                    nebula_client.warning('Failed to write \'motor_light\' to Wemos Motor')
-    else:
-        # Light handling
-        if IPCam_motor.motion_timeout():
-            # Last change to light setting was more then the hysteresis limit, so a change is allowed
-            if motor_light_state:
-                # There is no motion detected and the light is on so we turn the light off
-                motor_light_state = 0
-                if arduino_client.set_value('motor_light', motor_light_state):
-                    nebula_client.debug('Wrote \'LOW\' to \'motor_light\' to Wemos Motor')
-                else:
-                    nebula_client.warning('Failed to write \'motor_light\' to Wemos Motor')
+        # Check for new motion at Motor IPCam
+        if IPCam_motor.motion_detect():
+            # Alarm handling
+            # print('Alarm')
+            pushover_client.message('Alarm triggered!', IPCam_motor.snapshot(), 'GuardHouse Security', 'high', 'alien')
 
             # Strobe handling
-            if strobe_state:
-                strobe_state = 0
+            if not strobe_state:
+                strobe_state = 1
                 if arduino_client.set_value('strobe', strobe_state):
-                    nebula_client.debug('Wrote \'LOW\' to \'strobe\' to Wemos Motor')
+                    nebula_client.debug('Wrote \'HIGH\' to \'strobe\' to Wemos Motor')
                 else:
                     nebula_client.warning('Failed to write \'strobe\' to Wemos Motor')
-        # print('Don\'t worry...')
+
+            # Light handling
+            if arduino_client.get_value('day_night'):
+                # It is dark out so we should turn the light on if...
+                if not motor_light_state:
+                    # ... it is off
+                    motor_light_state = 1
+                    if arduino_client.set_value('motor_light', motor_light_state):
+                        nebula_client.debug('Wrote \'HIGH\' to \'motor_light\' to Wemos Motor')
+                    else:
+                        nebula_client.warning('Failed to write \'motor_light\' to Wemos Motor')
+        else:
+            # Light handling
+            if IPCam_motor.motion_timeout():
+                # Last change to light setting was more then the hysteresis limit, so a change is allowed
+                if motor_light_state:
+                    # There is no motion detected and the light is on so we turn the light off
+                    motor_light_state = 0
+                    if arduino_client.set_value('motor_light', motor_light_state):
+                        nebula_client.debug('Wrote \'LOW\' to \'motor_light\' to Wemos Motor')
+                    else:
+                        nebula_client.warning('Failed to write \'motor_light\' to Wemos Motor')
+
+                # Strobe handling
+                if strobe_state:
+                    strobe_state = 0
+                    if arduino_client.set_value('strobe', strobe_state):
+                        nebula_client.debug('Wrote \'LOW\' to \'strobe\' to Wemos Motor')
+                    else:
+                        nebula_client.warning('Failed to write \'strobe\' to Wemos Motor')
+            # print('Don\'t worry...')
+    except Exception as e:
+        nebula_client.critical(e)
+
 
 
