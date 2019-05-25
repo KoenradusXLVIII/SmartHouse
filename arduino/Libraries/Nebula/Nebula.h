@@ -21,8 +21,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-#ifndef Nebula_h
-#define Nebula_h
+#ifndef NEBULA_H
+#define NEBULA_H
 
 #include "Arduino.h"
 #include <ESP8266WiFi.h>
@@ -34,16 +34,16 @@ class Nebula
 {
   public:
     Nebula(char * APIKey, unsigned long uploadInterval, int nrVariables); // Constructor
-    void update(int * sensor_id_array, float * value_array);
-    void upload(int * sensor_id_array, float * value_array);
-
+    bool update(int * sensor_id_array, float * value_array);
   private:
-    void content_length(void)
+    // Functions
+    void upload(int * sensor_id_array, float * value_array);
+    int content_length(void);
+    // Variables
     unsigned long _previousUpload = 0;
-    unsigned long _uploadInterval = 0;
-    char _APIKey[36] = "";
-    int _nrVariables = 0;
-
+    unsigned long _uploadInterval;
+    char _APIKey[37];
+    int _nrVariables;
 };
 
 #endif

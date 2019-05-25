@@ -28,23 +28,21 @@ SOFTWARE.
 
 #define VAR_NAME_MAX_LENGTH 16 // 11 characters and '\0'
 #define VAR_VALUE_MAX_LENGTH 16 // max 9.999.999 (7 digits and '\0')
+#define ALL "all"
+#define INVALID "Invalid parameter"
 
 class Json
 {
   public:
-    Json(); // Constructor
-    void parse_command(char * charCommand);
-    char get_cmd_type(void);
-    char * get_var_name(void);
-    float get_var_value(void);
-    void set_var_value(float floatSetValue);
-    char * get_response(void);
+    Json(int intVarCount);  // Constructor
+    void process(char * charJsonInput, char * charJsonOutput, const char charVarNames[][VAR_NAME_MAX_LENGTH], float * floatVarValues);
   private:
-    char charCmdType;
-    char charName[VAR_NAME_MAX_LENGTH];
-    float floatValue;
-    char charValue[VAR_VALUE_MAX_LENGTH];
-    char charResponse[VAR_NAME_MAX_LENGTH+VAR_VALUE_MAX_LENGTH+1];
+    // Functions
+    int get_id_from_name(char * charVarName, const char charVarNames[][VAR_NAME_MAX_LENGTH]);
+    void parse_all(char * charJsonOutput, const char charVarNames[][VAR_NAME_MAX_LENGTH], float * floatVarValues); 
+    void parse_single(char * charJsonOutput, const char charVarNames[][VAR_NAME_MAX_LENGTH], float * floatVarValues, int intVarId);    
+    // Variables
+    int _intVarCount;
 };
 
 #endif

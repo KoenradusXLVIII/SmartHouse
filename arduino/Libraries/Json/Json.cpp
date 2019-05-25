@@ -25,57 +25,97 @@ SOFTWARE.
 #include "Arduino.h"
 #include "Json.h"
 
-Json::Json()
-{
-  // Constructor is empty
+// Constructor
+Json::Json(int intVarCount)
+{  
+  _intVarCount = intVarCount;
 }
 
-void Json::parse_command(char * charCommand)
-{
-  // Intialise variables
-  int intValue;  
-  charCmdType = 'G';     // Default to GET command
-  strcpy(charName, charCommand);
+//
+// Public functions
+//
 
-  for (int i = 0; i < strlen(charCommand); i++ ){
-    if (charCommand[i] == '/') { // Command contains '/', so this is a SET command
+void Json::process(char * charJsonInput, char * charJsonOutput, const char charVarNames[][VAR_NAME_MAX_LENGTH], float * floatVarValues)
+{
+  // Intialise variables 
+  char charCmdType;
+  char charVarName[VAR_NAME_MAX_LENGTH];
+  int intVarValue; 
+  int intVarId;
+  
+  // Default to GET command
+  charCmdType = 'G';
+  strcpy(charVarName, charJsonInput);
+
+  // Extract command type, variable name and value
+  for (int i = 0; i < strlen(charJsonInput); i++ ){
+    if (charJsonInput[i] == '/') { // Command contains '/', so this is a SET command
       charCmdType = 'S';
-      charCommand[i] = ' ';
-      sscanf(charCommand,"%s %d", charName, &intValue);
-      floatValue = (float)intValue;
-      dtostrf(floatValue, 3, 2, charValue);
+      charJsonInput[i] = ' ';
+      sscanf(charJsonInput,"%s %d", charVarName, &intVarValue);
       break;
     } 
   }
+  
+  // Parse command
+  if (strcmp(charVarName, ALL) == 0) {
+      // All parameters requested
+      parse_all(charJsonOutput, charVarNames, floatVarValues);
+  } else {
+      // Single parameter requested
+      intVarId = get_id_from_name(charVarName, charVarNames);
+      if (intVarId >= 0) {
+          if (charCmdType == 'S') {
+              // Write value to array
+              floatVarValues[intVarId] = (float) intVarValue;
+          } 
+          // Write array value to output buffer
+          parse_single(charJsonOutput, charVarNames, floatVarValues, intVarId);
+      } else {
+          // Invalid parameter requested
+          strcpy(charJsonOutput, INVALID);
+      }
+  }  
 }
 
-char Json::get_cmd_type(void)
+//
+// Private functions
+//
+
+int Json::get_id_from_name(char * charVarName, const char charVarNames[][VAR_NAME_MAX_LENGTH])
 {
-  return charCmdType;
+  for (int i = 0; i < _intVarCount; i++ ) {
+    if (strcmp(charVarNames[i], charVarName) == 0)
+      return i;
+  }
+  return -1;       
 }
 
-char * Json::get_var_name(void)
+void Json::parse_all(char * charJsonOutput, const char charVarNames[][VAR_NAME_MAX_LENGTH], float * floatVarValues)
 {
-  return charName;
+  char charVarValue[VAR_NAME_MAX_LENGTH];
+  
+  strcpy(charJsonOutput, "{\"");
+  for (int i = 0; i < _intVarCount; i++ ) {
+    strcat(charJsonOutput, charVarNames[i]);
+    strcat(charJsonOutput, "\":");
+    dtostrf(floatVarValues[i], 3, 2, charVarValue);
+    strcat(charJsonOutput, charVarValue);
+    if (i < (_intVarCount - 1))
+      strcat(charJsonOutput, ",\"");
+  }
+  strcat(charJsonOutput, "}");    
 }
 
-float Json::get_var_value(void)
-{
-  return floatValue;
-}
-
-void Json::set_var_value(float floatSetValue)
-{
-  floatValue = floatSetValue;
-  dtostrf(floatValue, 3, 2, charValue);
-}
-
-char * Json::get_response(void)
+void Json::parse_single(char * charJsonOutput, const char charVarNames[][VAR_NAME_MAX_LENGTH], float * floatVarValues, int intVarId)
 { 
-  strcpy(charResponse, "{\"");
-  strcat(charResponse, charName);
-  strcat(charResponse, "\":");
-  strcat(charResponse, charValue);
-  strcat(charResponse, "}");
-  return charResponse;
+  char charVarValue[VAR_NAME_MAX_LENGTH];
+  
+  strcpy(charJsonOutput, "{\"");
+  strcat(charJsonOutput, charVarNames[intVarId]);
+  strcat(charJsonOutput, "\":");
+  dtostrf(floatVarValues[intVarId], 3, 2, charVarValue);
+  strcat(charJsonOutput, charVarValue);
+  strcat(charJsonOutput, "}");
 }
+

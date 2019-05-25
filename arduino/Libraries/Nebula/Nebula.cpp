@@ -28,26 +28,36 @@ SOFTWARE.
 Nebula::Nebula(char * APIKey, unsigned long uploadInterval, int nrVariables) // Constructor
 {
   strcpy(_APIKey, APIKey);
-  _uploadInterval = uploadInterval;
+  _APIKey[36] = '\0';
+  _uploadInterval = uploadInterval*60*1000;
   _nrVariables = nrVariables;
 }
 
-void Nebula::update(int * sensor_id_array, float * value_array) 
+//
+// Public functions
+//
+
+bool Nebula::update(int * sensor_id_array, float * value_array) 
 {
   unsigned long now = millis();
-  if (now - _previousUpload >= nebulaInterval) {
+  if (now - _previousUpload >= _uploadInterval) {
     _previousUpload = now;
     upload(sensor_id_array, value_array);
+    return true;
   }    
+  return false;
 }
+
+//
+// Private functions
+//
 
 void Nebula::upload(int * sensor_id_array, float * value_array)
 {
-  if (_uploadInterval != 0 && _nrVariables != 0 && _APIKey != "") {
     // Instantiate WiFi client
     WiFiClient client;
     client.connect(HOST, PORT);
-    
+
     // Send POST message
     // Send message header
     client.println(F("POST /api/graph/post.php HTTP/1.1"));
@@ -58,7 +68,7 @@ void Nebula::upload(int * sensor_id_array, float * value_array)
     client.print(F("Content-Length: "));
     client.println(content_length());
     client.println(F(""));
-    
+
     // Send message body
     client.println(F("{"));
     client.print(F("\"api_key\":\""));
@@ -80,18 +90,50 @@ void Nebula::upload(int * sensor_id_array, float * value_array)
     client.println(F("}"));
     client.println(F(""));
     
+    // Send POST message
+    // Send message header
+    Serial.println(F("POST /api/graph/post.php HTTP/1.1"));
+    Serial.println(F("Host: joostverberk.nl"));
+    Serial.println(F("Content-Type: application/x-www-form-urlencoded"));
+    Serial.println(F("User-Agent: Wemos/1.0"));
+    Serial.println(F("Connection: close"));
+    Serial.print(F("Content-Length: "));
+    Serial.println(content_length());
+    Serial.println(F(""));
+
+    // Send message body
+    Serial.println(F("{"));
+    Serial.print(F("\"api_key\":\""));
+    Serial.print(_APIKey);
+    Serial.println(F("\","));
+    Serial.println(F("\"values\":["));
+    for (int i = 0; i < _nrVariables; i++) {
+        Serial.print(F("{\"sensor_id\":"));
+        Serial.print(sensor_id_array[i]);
+        Serial.print(F(",\"value\":"));
+        Serial.print(value_array[i]);        
+        if (i < _nrVariables - 1) {
+            Serial.println(F("},"));
+        } else {
+            Serial.println(F("}"));           
+        }
+    }
+    Serial.println(F("]"));
+    Serial.println(F("}"));
+    Serial.println(F(""));    
+
     // Close connection
     client.stop();
-  }
 }
 
-void Nebula::content_length(void)
+int Nebula::content_length(void)
 {
     int content_length = 73; // API key and empty values array []
     for (int i = 0; i < _nrVariables; i++) {
         content_length += 32;
     }
     content_length -= 1; // Compensate for last value not having ,
+    return content_length;
 }
 
 

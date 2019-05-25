@@ -1,5 +1,5 @@
 import requests
-import re
+import json
 
 CRITICAL = 50
 ERROR = 40
@@ -49,7 +49,7 @@ class Client:
         url = self.url + '/api/graph/trail.php'
         data = self.auth.copy()
         data['level'] = _levelToName[level]
-        data['message'] = re.escape(msg)
+        data['message'] = json.dumps(msg)
         requests.post(url, json=data)
 
     def debug(self, msg):
