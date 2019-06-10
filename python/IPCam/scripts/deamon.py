@@ -26,8 +26,10 @@ nebula_client.set_level(nebula.INFO)
 # PID file location
 if platform.system() == 'Windows':
     pidfile = 'c:\\tmp\\IPCam_daemon.pid'
+    recording_dir = 'S:\\WCAU45635050\\webcam'
 elif platform.system() == 'Linux':
     pidfile = '/tmp/IPCam_daemon.pid'
+    recording_dir = '/home/pi/WCAU45635050/webcam'
 
 # Check if deamon already running
 if os.path.isfile(pidfile):
@@ -47,7 +49,9 @@ with open(pidfile, 'w') as fp:
 
 # Set up IPCam clients
 IPCam_motor = IPCam.Client(**cfg['ipcam']['motor'])
+IPCam_motor.set_base_path(recording_dir)
 IPCam_garden = IPCam.Client(**cfg['ipcam']['garden'])
+IPCam_garden.set_base_path(recording_dir)
 
 # Set up Pushover client
 pushover_client = pushover.Client(**cfg['pushover'])
@@ -61,15 +65,12 @@ hue_client = hue.Client(**cfg['hue'])
 # Local variables
 motor_light_state = 0
 strobe_state = 0
+last_motion = 0
 
 while True:
     try:
-        # Sleep for x seconds
-        time.sleep(cfg['ipcam']['polling'])
-        #print('Polling!')
-
         # Check for day/night transitions
-        night = IPCam_motor.day_night()
+        night = IPCam_motor.delta_day_night()
         if night is not None:
             if arduino_client.set_value('day_night', night):
                 if night:
@@ -84,9 +85,8 @@ while True:
                 nebula_client.warning('Failed to write \'day_night\' to Wemos Motor')
 
         # Check for new motion at Motor IPCam
-        if IPCam_motor.motion_detect():
+        if IPCam_motor.new_recording():
             # Alarm handling
-            # print('Alarm')
             pushover_client.message('Alarm triggered!', IPCam_motor.snapshot(), 'GuardHouse Security', 'high', 'alien')
 
             # Strobe handling
@@ -107,10 +107,10 @@ while True:
                         nebula_client.debug('Wrote \'HIGH\' to \'motor_light\' to Wemos Motor')
                     else:
                         nebula_client.warning('Failed to write \'motor_light\' to Wemos Motor')
+
+            last_motion = time.time()
         else:
-            # Light handling
-            if IPCam_motor.motion_timeout():
-                # Last change to light setting was more then the hysteresis limit, so a change is allowed
+            if (time.time() - last_motion) > cfg['ipcam']['motion_timeout']:
                 if motor_light_state:
                     # There is no motion detected and the light is on so we turn the light off
                     motor_light_state = 0
@@ -126,7 +126,6 @@ while True:
                         nebula_client.debug('Wrote \'LOW\' to \'strobe\' to Wemos Motor')
                     else:
                         nebula_client.warning('Failed to write \'strobe\' to Wemos Motor')
-            # print('Don\'t worry...')
     except Exception as e:
         nebula_client.critical(e)
 

@@ -1,26 +1,31 @@
 import requests
 import time
 import re
+import os
 from xml.etree import ElementTree
 
+
+# noinspection SpellCheckingInspection,SpellCheckingInspection
 class Client:
-    def __init__(self, ip, port, usr, pwd):
+    def __init__(self, ip, port, usr, pwd, name):
         self.url = 'http://' + ip + ':' + port + '/'
+        # noinspection SpellCheckingInspection
         self.CGI = self.url + 'cgi-bin/CGIProxy.fcgi'
-        self.usr = usr # Foscam user needs admin rights to access getDevState!
+        self.usr = usr                  # Foscam user needs admin rights to access getDevState!
         self.pwd = pwd
-        self.timeout = 1 # seconds
-        self.motion_hysteresis = 30  # seconds
+        self.name = name
+        self.timeout = 1                # seconds
+        self.connection_timeout = 60     # seconds
 
         # Internal variables
-        self._last_motion_state = False
-        self._last_motion_time = 0
+        self._last_connection_time = 0
         self._last_day_night_state = 0
-
+        self._data = None
+        self._path = ''
+        self._no_files = 0
 
         # Try to connect to the device
         self._check_connection()
-
 
     def _check_connection(self):
         payload = {'usr': self.usr, 'pwd': self.pwd, 'cmd': 'getDevInfo'}
@@ -38,52 +43,57 @@ class Client:
             raise ConnectionError('Connection timeout')
 
     def _get_devstate(self):
-        payload = {'usr': self.usr, 'pwd': self.pwd, 'cmd': 'getDevState'}
-        try:
-            r = requests.get(self.CGI, params=payload, timeout=self.timeout)
-            return ElementTree.fromstring(r.text)  # Extract XML tree
-        except requests.exceptions.Timeout:
-            return None
-        except ElementTree.ParseError:
-            return None
+        if (time.time() - self._last_connection_time) > self.connection_timeout:
+            payload = {'usr': self.usr, 'pwd': self.pwd, 'cmd': 'getDevState'}
+            try:
+                r = requests.get(self.CGI, params=payload, timeout=self.timeout)
+                self._data = ElementTree.fromstring(r.text)  # Extract XML tree
+                self._last_connection_time = time.time()
+            except requests.exceptions.Timeout:
+                self._data = None
+            except ElementTree.ParseError:
+                self._data = None
+
+    def set_base_path(self, base_path):
+        self._path = os.path.join(base_path, self.name)
+        self._path = os.path.join(self._path, 'record')
+        self._no_files = self._count_recordings()
+
+    def new_recording(self):
+        new_recording = False
+        if self._path:
+            no_files = self._count_recordings()
+            if no_files > self._no_files:
+                # New recording detected
+                new_recording = True
+
+            self._no_files = no_files
+            return new_recording
+        else:
+            raise Exception('Recording base path not set!')
+
+    def _count_recordings(self):
+        files = [f for f in os.listdir(self._path) if f.endswith('.mkv')]
+        return len(files)
 
     def motion_detect(self):
-        data = self._get_devstate()
-        if data is not None:
-            if data.find('motionDetectAlarm').text == '1':
-                self.last_motion_state = False
+        self._get_devstate()
+        if self._data is not None:
+            if self._data.find('motionDetectAlarm').text == '1':
+                # No motion detected
                 return False
-            elif data.find('motionDetectAlarm').text == '2':
+            elif self._data.find('motionDetectAlarm').text == '2':
                 # Motion detected
-                if not self.last_motion_state:
-                    # New motion detected
-                    self.last_motion_state = True
-                    if self.motion_timeout():
-                        # New motion detected outside hysteresis window
-                        self._last_motion_time = time.time()
-                        return True
-                    else:
-                        # New motion detected inside hysteresis window, reset time
-                        self._last_motion_time = time.time()
-                        print('Reset')
-                        return False
-                else:
-                    # Only report new motions
-                    return False
+                return True
 
         # Unknown state
         return None
 
-    def motion_timeout(self):
-        return (time.time() - self._last_motion_time) > self.motion_hysteresis
+    def delta_day_night(self):
+        self._get_devstate()
+        day_night_state = int(self._data.find('infraLedState').text)
 
-    def day_night(self):
-        data = self._get_devstate()
-        try:
-            day_night_state = int(data.find('infraLedState').text)
-        except (AttributeError, ValueError):
-            return None
-
+        # Only report changes
         if  day_night_state != self._last_day_night_state:
             self._last_day_night_state = day_night_state
             return day_night_state
@@ -95,7 +105,7 @@ class Client:
         try:
             r = requests.get(self.CGI, params=payload, timeout=self.timeout)
             reg = re.search(r'(Snap_\d{8}-\d{6}.jpg)', r.text)  # Get snapshot name: Snap_YYYYMMDD_HHMMSS.jpg
-            r = requests.get(self.url+ 'snapPic/' + reg.group(1))
+            r = requests.get(self.url + 'snapPic/' + reg.group(1))
             return r.content
         except requests.exceptions.Timeout:
             return None
