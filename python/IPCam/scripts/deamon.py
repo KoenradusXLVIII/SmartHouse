@@ -126,6 +126,8 @@ while True:
                         nebula_client.debug('Wrote \'LOW\' to \'strobe\' to Wemos Motor')
                     else:
                         nebula_client.warning('Failed to write \'strobe\' to Wemos Motor')
+
+        time.sleep(1)
     except Exception as e:
         nebula_client.critical(e)
 
