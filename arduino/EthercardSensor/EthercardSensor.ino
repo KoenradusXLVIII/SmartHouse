@@ -6,8 +6,8 @@ Ethernet shield attached to pins 10, 11, 12, 13
 #include <EtherCard.h>
 
 #define BUFFER 5
-#define E_PV_RESTORE 498105         // Wh
-#define H20_RESTORE 15940           // l
+#define E_PV_RESTORE 1241332        // Wh
+#define H20_RESTORE 28207           // l
 #define MIN_PV_POWER 10             // W
 #define MAX_PV_POWER 2100           // W (2kW + 5% margin)
 #define MS_PER_HOUR 3600000  

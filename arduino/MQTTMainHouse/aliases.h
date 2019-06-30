@@ -14,4 +14,7 @@
 #define NIGHT 1
 #define NA -1
 
+#define MAX_LENGTH_SIGNED_INT 6
+#define MAX_LENGTH_SIGNED_LONG 11
+
 #endif

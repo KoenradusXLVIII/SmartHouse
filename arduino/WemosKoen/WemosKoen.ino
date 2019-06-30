@@ -39,7 +39,7 @@ char charResponse[1 + VAR_COUNT * (1 + VAR_NAME_MAX_LENGTH + 1 + 1 + VAR_VALUE_M
 char charCommand[VAR_NAME_MAX_LENGTH + VAR_VALUE_MAX_LENGTH + 1] = "";
 const char charInvalid[] PROGMEM = "Invalid parameter";
 const char var_array[VAR_COUNT][VAR_NAME_MAX_LENGTH] = {"sprinkler_front", "sprinkler_back", "relay_3", "relay_4"};
-float value_array[VAR_COUNT] = {ON, OFF, ON, OFF};
+float value_array[VAR_COUNT] = {OFF, OFF, OFF, OFF};
 int sensor_id_array[VAR_COUNT] = {87, 86, 88, 89};
 Json json;
 
