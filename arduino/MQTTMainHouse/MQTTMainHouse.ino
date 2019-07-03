@@ -37,8 +37,8 @@ float P_PV_value = 0;
 float P_PV[BUF_LENGTH]; // W
 int S0_prev_state = 1;
 unsigned long last_pulse = millis();
-const char *energy_topic = "mainhouse/energy";
-const char *power_topic = "mainhouse/power";
+const char *energy_topic = mqtt_id + "/mainhouse/energy";
+const char *power_topic = mqtt_id + "/mainhouse/power";
 
 // H20 configuration
 #define H2O 2
