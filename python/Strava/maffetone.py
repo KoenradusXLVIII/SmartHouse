@@ -19,7 +19,7 @@ def main():
 
     # Filtering
     df_selected = df[df['type'] == 'Run']
-    df_selected = df_selected[df_selected['name'].str.contains('Maffetone')]
+    df_selected = df_selected[df_selected['name'].str.contains('Maffetone run')]
     df_selected = df_selected.sort_values('start_date_local')
     print(df_selected)
 
