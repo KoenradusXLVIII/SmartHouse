@@ -24,3 +24,4 @@ config.h
 *test*
 *.ico
 python/random/
+*.key
