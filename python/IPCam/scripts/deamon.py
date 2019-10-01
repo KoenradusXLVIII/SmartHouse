@@ -56,8 +56,9 @@ IPCam_garden.set_base_path(recording_dir)
 # Set up Pushover client
 pushover_client = pushover.Client(**cfg['pushover'])
 
-# Set up Guard House Arduino client
-arduino_client = arduino.Client(**cfg['arduino'])
+# Set up Arduino clients
+arduino_motor = arduino.Client(**cfg['arduino']['motor'])
+arduino_guardhouse = arduino.Client(**cfg['arduino']['guardhouse'])
 
 # Set up Hue client
 hue_client = hue.Client(**cfg['hue'])
@@ -72,17 +73,17 @@ while True:
         # Check for day/night transitions
         night = IPCam_motor.delta_day_night()
         if night is not None:
-            if arduino_client.set_value('day_night', night):
+            if arduino_guardhouse.set_value('day_night', night):
                 if night:
-                    nebula_client.info('Transition to night written to Wemos Motor')
+                    nebula_client.info('Transition to night written to Arduino Guardhouse')
                     # If no one home turns lights on in 'not home' mode
                     if hue_client.get_all_off():
                         hue_client.set_scene('Not home')
                         nebula_client.info('Switching lights on to \'Not home\' mode')
                 else:  # If not night, then day
-                    nebula_client.info('Transition to day written to Wemos Motor')
+                    nebula_client.info('Transition to day written to Arduino Guardhouse')
             else:
-                nebula_client.warning('Failed to write \'day_night\' to Wemos Motor')
+                nebula_client.warning('Failed to write \'day_night\' to Arduino Guardhouse')
 
         # Check for new motion at Motor IPCam
         if IPCam_motor.new_recording():
@@ -92,18 +93,18 @@ while True:
             # Strobe handling
             if not strobe_state:
                 strobe_state = 1
-                if arduino_client.set_value('strobe', strobe_state):
+                if arduino_motor.set_value('strobe', strobe_state):
                     nebula_client.debug('Wrote \'HIGH\' to \'strobe\' to Wemos Motor')
                 else:
                     nebula_client.warning('Failed to write \'strobe\' to Wemos Motor')
 
             # Light handling
-            if arduino_client.get_value('day_night'):
+            if arduino_guardhouse.get_value('day_night'):
                 # It is dark out so we should turn the light on if...
                 if not motor_light_state:
                     # ... it is off
                     motor_light_state = 1
-                    if arduino_client.set_value('motor_light', motor_light_state):
+                    if arduino_motor.set_value('motor_light', motor_light_state):
                         nebula_client.debug('Wrote \'HIGH\' to \'motor_light\' to Wemos Motor')
                     else:
                         nebula_client.warning('Failed to write \'motor_light\' to Wemos Motor')
@@ -114,7 +115,7 @@ while True:
                 if motor_light_state:
                     # There is no motion detected and the light is on so we turn the light off
                     motor_light_state = 0
-                    if arduino_client.set_value('motor_light', motor_light_state):
+                    if arduino_motor.set_value('motor_light', motor_light_state):
                         nebula_client.debug('Wrote \'LOW\' to \'motor_light\' to Wemos Motor')
                     else:
                         nebula_client.warning('Failed to write \'motor_light\' to Wemos Motor')
@@ -122,7 +123,7 @@ while True:
                 # Strobe handling
                 if strobe_state:
                     strobe_state = 0
-                    if arduino_client.set_value('strobe', strobe_state):
+                    if arduino_motor.set_value('strobe', strobe_state):
                         nebula_client.debug('Wrote \'LOW\' to \'strobe\' to Wemos Motor')
                     else:
                         nebula_client.warning('Failed to write \'strobe\' to Wemos Motor')

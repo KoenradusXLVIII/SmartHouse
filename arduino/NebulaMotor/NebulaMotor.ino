@@ -13,8 +13,6 @@
 // Aliases
 #define OFF 0
 #define ON 1
-#define DAY 0
-#define NIGHT 1
 
 // WiFi server configuration
 #define MAX_LINE_LENGTH 200
@@ -35,13 +33,13 @@ const char charInvalid[] PROGMEM = "Invalid parameter";
 
 // Local variable definition
 // ! Put the local IO last !
-const char var_array[VAR_COUNT][VAR_NAME_MAX_LENGTH] = {"day_night", "motor_light", "strobe"};
-float value_array[VAR_COUNT] = {DAY, OFF, OFF};
-int sensor_id_array[VAR_COUNT] = {20, 19, 90};
+const char var_array[VAR_COUNT][VAR_NAME_MAX_LENGTH] = {"motor_light", "strobe"};
+float value_array[VAR_COUNT] = {OFF, OFF};
+int sensor_id_array[VAR_COUNT] = {19, 90};
 Json json;
 
 // I/O Variables 
-#define IO_START 1
+#define IO_START 0
 int IO_pin_array[VAR_COUNT] = {D0, D1};
 
 // WiFi client configuration
