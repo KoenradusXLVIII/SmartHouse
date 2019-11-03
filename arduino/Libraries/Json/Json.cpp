@@ -40,7 +40,7 @@ void Json::process(char * charJsonInput, char * charJsonOutput, const char charV
   // Intialise variables 
   char charCmdType;
   char charVarName[VAR_NAME_MAX_LENGTH];
-  int intVarValue; 
+  int floatVarValue; 
   int intVarId;
   
   // Default to GET command
@@ -52,7 +52,7 @@ void Json::process(char * charJsonInput, char * charJsonOutput, const char charV
     if (charJsonInput[i] == '/') { // Command contains '/', so this is a SET command
       charCmdType = 'S';
       charJsonInput[i] = ' ';
-      sscanf(charJsonInput,"%s %d", charVarName, &intVarValue);
+      sscanf(charJsonInput,"%s %f", charVarName, &floatVarValue);
       break;
     } 
   }
