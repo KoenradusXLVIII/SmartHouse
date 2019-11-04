@@ -49,8 +49,8 @@ class Client:
         url = self.url + '/api/graph/trail.php'
         data = self.auth.copy()
         data['level'] = _levelToName[level]
-        data['message'] = json.dumps(msg)
-        requests.post(url, json=data)
+        data['message'] = json.dumps(msg).strip('"')
+        ret = requests.post(url, json=data)
 
     def debug(self, msg):
         if DEBUG >= self.level:
