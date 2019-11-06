@@ -5,17 +5,16 @@ import os
 from xml.etree import ElementTree
 
 
-# noinspection SpellCheckingInspection,SpellCheckingInspection
 class Client:
     def __init__(self, ip, port, usr, pwd, name):
         self.url = 'http://' + ip + ':' + port + '/'
-        # noinspection SpellCheckingInspection
         self.CGI = self.url + 'cgi-bin/CGIProxy.fcgi'
-        self.usr = usr                  # Foscam user needs admin rights to access getDevState!
+        self.usr = usr                      # Foscam user needs admin rights to access getDevState!
         self.pwd = pwd
         self.name = name
-        self.timeout = 1                # seconds
-        self.connection_timeout = 60     # seconds
+        self.timeout = 1                    # seconds
+        self.connection_timeout = 60        # seconds
+        self.retries = 3
 
         # Internal variables
         self._last_connection_time = 0
@@ -23,11 +22,12 @@ class Client:
         self._data = None
         self._path = ''
         self._no_files = 0
+        self._snapshot = ''
 
         # Try to connect to the device
         self._check_connection()
 
-    def _check_connection(self):
+    def _check_connection(self, itt=0):
         payload = {'usr': self.usr, 'pwd': self.pwd, 'cmd': 'getDevInfo'}
         try:
             r = requests.get(self.CGI, params=payload, timeout=self.timeout)
@@ -40,9 +40,12 @@ class Client:
             else:
                 raise ConnectionError('Invalid response')
         except requests.exceptions.Timeout:
-            raise ConnectionError('Connection timeout')
+            if itt < self.retries:
+                self._check_connection(itt + 1)
+            else:
+                raise ConnectionError('Connection timeout')
 
-    def _get_devstate(self):
+    def _get_devstate(self, itt=0):
         if (time.time() - self._last_connection_time) > self.connection_timeout:
             payload = {'usr': self.usr, 'pwd': self.pwd, 'cmd': 'getDevState'}
             try:
@@ -50,9 +53,25 @@ class Client:
                 self._data = ElementTree.fromstring(r.text)  # Extract XML tree
                 self._last_connection_time = time.time()
             except requests.exceptions.Timeout:
-                self._data = None
+                if itt < self.retries:
+                    self._get_devstate(itt + 1)
+                else:
+                    self._data = None
             except ElementTree.ParseError:
                 self._data = None
+
+    def _get_snapshot(self, itt=0):
+        payload = {'usr': self.usr, 'pwd': self.pwd, 'cmd': 'snapPicture'}
+        try:
+            r = requests.get(self.CGI, params=payload, timeout=self.timeout)
+            reg = re.search(r'(Snap_\d{8}-\d{6}.jpg)', r.text)  # Get snapshot name: Snap_YYYYMMDD_HHMMSS.jpg
+            r = requests.get(self.url + 'snapPic/' + reg.group(1))
+            self._snapshot = r.content
+        except requests.exceptions.Timeout:
+            if itt < self.retries:
+                self._get_snapshot(itt + 1)
+            else:
+                self._snapshot = ''
 
     def set_base_path(self, base_path):
         self._path = os.path.join(base_path, self.name)
@@ -76,6 +95,7 @@ class Client:
         files = [f for f in os.listdir(self._path) if f.endswith('.mkv')]
         return len(files)
 
+
     def motion_detect(self):
         self._get_devstate()
         if self._data is not None:
@@ -91,24 +111,21 @@ class Client:
 
     def delta_day_night(self):
         self._get_devstate()
-        day_night_state = int(self._data.find('infraLedState').text)
+        if self._data:
+            day_night_state = int(self._data.find('infraLedState').text)
+        else:
+            return None
 
         # Only report changes
-        if  day_night_state != self._last_day_night_state:
+        if day_night_state != self._last_day_night_state:
             self._last_day_night_state = day_night_state
             return day_night_state
         else:
             return None
 
     def snapshot(self):
-        payload = {'usr': self.usr, 'pwd': self.pwd, 'cmd': 'snapPicture'}
-        try:
-            r = requests.get(self.CGI, params=payload, timeout=self.timeout)
-            reg = re.search(r'(Snap_\d{8}-\d{6}.jpg)', r.text)  # Get snapshot name: Snap_YYYYMMDD_HHMMSS.jpg
-            r = requests.get(self.url + 'snapPic/' + reg.group(1))
-            return r.content
-        except requests.exceptions.Timeout:
-            return None
+        self._get_snapshot()
+        return self._snapshot
 
 
 

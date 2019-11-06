@@ -16,10 +16,9 @@ class Client:
                 return float(r[var.lower()])
             else:
                 return None
-        except (requests.exceptions.ConnectionError, requests.exceptions.ConnectTimeout):
-            itt += 1
+        except (requests.exceptions.ConnectionError, requests.exceptions.ConnectTimeout, requests.ReadTimeout):
             if itt < self.retries:
-                self.get_value(var, itt)
+                self.get_value(var, itt + 1)
             else:
                 return None
 
@@ -32,14 +31,13 @@ class Client:
                 return r
             else:
                 return None
-        except (requests.exceptions.ConnectionError, requests.exceptions.ConnectTimeout):
-            itt += 1
+        except (requests.exceptions.ConnectionError, requests.exceptions.ConnectTimeout, requests.ReadTimeout):
             if itt < self.retries:
-                self.get_all(itt)
+                self.get_all(itt + 1)
             else:
                 return None
 
-    def set_value(self, var, value, itt = 0):
+    def set_value(self, var, value, itt=0):
         url = self.url + var.lower() + '/' + str(value)
         try:
             r = requests.get(url, timeout=self.timeout)
@@ -52,10 +50,9 @@ class Client:
             else:
                 return None
 
-        except (requests.exceptions.ConnectionError, requests.exceptions.ConnectTimeout):
-            itt += 1
+        except (requests.exceptions.ConnectionError, requests.exceptions.ConnectTimeout, requests.ReadTimeout):
             if itt < self.retries:
-                self.set_value(var, value, itt)
+                self.set_value(var, value, itt + 1)
             else:
                 return None
 

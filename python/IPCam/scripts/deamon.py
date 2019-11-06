@@ -116,7 +116,7 @@ def main():
 
     while True:
         # Check for day/night transitions
-        night = IPCam_motor.delta_day_night()
+        night = IPCam_garden.delta_day_night()
         if night is not None:
             if arduino_guardhouse.set_value('day_night', night):
                 if night:

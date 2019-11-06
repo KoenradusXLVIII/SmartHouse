@@ -140,8 +140,8 @@ if hour == 6 or force:
     # Write daily forecast summary to logging
     nebula_client.info("= DAILY WEATHER FORECAST =")
     nebula_client.info("Forecasted maximum temperature is: %dC" % owm_client.temp_forecast[0])
-    nebula_client.info("Yesterday recorded rain: %s mm" % rain_yesterday)
-    nebula_client.info("Next 3 days rain forecast per day is: %s mm" % owm_client.rain_forecast)
+    nebula_client.info("Yesterday recorded rain: %.2f mm" % rain_yesterday)
+    nebula_client.info("Next 3 days rain forecast per day is: [%s] mm" % (', '.join('%.2f' % i for i in owm_client.rain_forecast)))
     if lim_days_ahead:
         nebula_client.info("Next %d days rain forecast in total is: %s mm" %
                            (lim_days_ahead, sum(owm_client.rain_forecast[0:lim_days_ahead])))
