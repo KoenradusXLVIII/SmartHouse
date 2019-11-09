@@ -73,7 +73,7 @@ class Client:
             self._trail(msg, CRITICAL)
 
     def add_single(self, sensor_id, value):
-        self.payload.append({'sensor_id': sensor_id, 'value': '%.2f' % float(value)})
+        self.payload.append({'sensor_id': int(sensor_id), 'value': '%.2f' % float(value)})
 
     def post_single(self, sensor_id, value):
         self.add_single(sensor_id, value)

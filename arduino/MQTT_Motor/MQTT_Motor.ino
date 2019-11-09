@@ -24,13 +24,6 @@ Blink blink(LED_BUILTIN, 1000);     // Blink every second
 PubSubClient mqtt_client(WifiClient);
 char node_uuid[12];
 
-// DS18B20
-#define BUF_LENGTH 3
-OneWire  ds(D2);  // on pin D2
-byte addr[8] = {0x28, 0xE0, 0xC4, 0x19, 0x17, 0x13, 0x01, 0x76};
-float calibration = 2.0;
-float buf_temp[BUF_LENGTH];
-
 // Numpy
 Numpy np;
 
@@ -69,6 +62,7 @@ void setup_wifi() {
   Serial.println(WiFi.macAddress());
 }
 
+// Initial setup
 void setup() {
   // Setup serial connection
   Serial.begin(9600);
@@ -96,17 +90,9 @@ void setup() {
   mqtt_client.subscribe(charTopic);
   Serial.print("Subscribing to topic: ");
   Serial.println(charTopic);
-
-  // Fill DS18B20 buffer
-  Serial.print(F("Initializing DS18B20 buffer"));
-  for (int i = 0; i<BUF_LENGTH; i++)
-  {
-    float temp = read_filtered_DS18B20(buf_temp, BUF_LENGTH, addr);  
-    Serial.print(F("."));
-  }
-  Serial.println(F(""));
 }
 
+// MQTT callback triggered on message received
 void callback(char* topic, byte* payload, unsigned int length) {
   int intValue;
   char charPayload[length];
@@ -115,16 +101,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
     charPayload[i] = (char)payload[i];
 
   sscanf(charPayload, "%d", &intValue);
-
   process_cmd(sensor_id(topic), intValue);
- 
-  Serial.print("Message for sensor: ");
-  Serial.print(sensor_id(topic));
-  Serial.print(" => ");
-  Serial.println(intValue); 
 }
 
-
+// Control IO based on MQTT command
 void process_cmd(int intSensorID, int intValue) {
   for (int i = 0; i < IO_COUNT; i++) {
     if (IO_ID[i] == intSensorID)
@@ -132,6 +112,7 @@ void process_cmd(int intSensorID, int intValue) {
   }
 }
 
+// Extract sensor ID from topic
 int sensor_id(char* topic) {
   int intSensorID;
 
@@ -144,19 +125,17 @@ int sensor_id(char* topic) {
   return intSensorID;
 }
 
+// Main loop
 void loop() {
   // Blink handling
-  //blink.update();
-
-  // DS18B20
-  float temp = read_filtered_DS18B20(buf_temp, BUF_LENGTH, addr);
+  blink.update();
 
   // MQTT
   mqtt_publish(TEMP_SENSOR_ID, temp);
   mqtt_client.loop();
-
 }
 
+// Extrac MAC to string
 void array_to_string(byte array[], unsigned int len, char buffer[])
 {
     for (unsigned int i = 0; i < len; i++)
@@ -173,19 +152,16 @@ void array_to_string(byte array[], unsigned int len, char buffer[])
 void mqtt_reconnect() {
   // Loop until we're reconnected
   while (!mqtt_client.connected()) {
-    Serial.print("Attempting MQTT connection...");
     // Attempt to connect
     if (mqtt_client.connect(node_uuid, MQTT_USER, MQTT_API_KEY)) {
-      Serial.println("connected");
     } else {
-      Serial.println(" try again in 5 seconds");
       // Wait 5 seconds before retrying
       delay(5000);
     }
   }
 }
 
-
+// Publish once every x minutes
 void mqtt_publish(int id, float value) {
   unsigned long longNow = millis();
   
@@ -197,7 +173,7 @@ void mqtt_publish(int id, float value) {
     if (!mqtt_client.connected())  // Reconnect if connection is lost
       mqtt_reconnect();
       
-    // Publish value
+    // Parse topic and value data
     char charTopic[TOPIC_LENGTH];
     char charID[MAX_LENGTH_SIGNED_INT];
     char charValue[6];
@@ -208,46 +184,7 @@ void mqtt_publish(int id, float value) {
     strcat(charTopic, charID);
     dtostrf(value, 3, 2, charValue);
 
-    Serial.print("MQTT upload of temperature: ");
-    Serial.println(charValue);
+    // Publish value
     mqtt_client.publish(charTopic, charValue, true);  
   }
-}
-
-float read_filtered_DS18B20(float *buf_data, int buf_length, byte *addr) {
-  // Shift buffer
-  for (int n = (buf_length - 1); n > 0; n--) {
-    buf_data[n] = buf_data[n - 1];
-  }
-
-  // Append new data
-  buf_data[0] = _DS18B20_read(addr);
-
-  // Return filtered mean (1 stdev)
-  return np.filt_mean(buf_data, buf_length, 1);
-}
-
-float _DS18B20_read(byte * addr){
- byte data[12];
- float celsius;
-
- ds.reset();
- ds.select(addr);
- ds.write(0x44, 1); // Start conversion
- delay(1000);
-
- ds.reset();
- ds.select(addr);
- ds.write(0xBE); // Read scratchpad
-
- for (int i=0; i<9; i++) {
-  data[i] = ds.read();
- }
-
- OneWire::crc8(data,8);
- 
- int16_t raw = (data[1] << 8) | data[0];
- celsius = (float)raw / 16.0;
-
- return celsius-calibration;
 }

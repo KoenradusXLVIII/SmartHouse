@@ -19,7 +19,7 @@ class Client:
 
         # Internal variables
         self._last_connection_time = 0
-        self._last_day_night_state = 0
+        self._last_day_night_state = None
         self._data = None
         self._path = ''
         self._no_files = 0

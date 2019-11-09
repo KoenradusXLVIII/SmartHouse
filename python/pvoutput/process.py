@@ -12,6 +12,7 @@ import logger
 import nebula
 import arduino
 import pushover
+import MQTT
 from diff import dx, dxdt
 import openweathermap
 
@@ -19,6 +20,7 @@ import openweathermap
 local = False  # Upload to PVOutput
 verbose = False  # Verbose output
 debug = False # Debug output
+nuc = False # Run on NUC instead of Raspberry Pi
 if len(sys.argv) > 1:
     if 'v' in sys.argv[1]:
         verbose = True
@@ -26,6 +28,8 @@ if len(sys.argv) > 1:
         local = True
     if 'd' in sys.argv[1]:
         debug = True
+    if 'n' in sys.argv[1]:
+        nuc = True
 
 # Load configuration YAML
 path = os.path.dirname(os.path.realpath(__file__))
@@ -34,6 +38,10 @@ cfg = yaml.load(fp)
 
 # Set up Pushover client
 pushover_client = pushover.Client(**cfg['pushover'])
+
+# Set up MQTT client
+mqtt_client = MQTT.Client(**cfg['mqtt'])
+mqtt_client.subscribe('nodes/#')
 
 # Set up Nebula API client
 nebula_client = nebula.Client(**cfg['nebula'])
@@ -71,13 +79,14 @@ def main():
         log_client.error('No data received from Main House')
         sys.exit()
 
-    # Get P1 data
-    if verbose:
-        print('Get P1 data...')
+    if not nuc:
+        # Get P1 data
+        if verbose:
+            print('Get P1 data...')
 
-    if not p1_client.read_telegram():
-        log_client.error('No valid P1 data after %d retries' % p1_client.retries)
-        sys.exit()
+        if not p1_client.read_telegram():
+            log_client.error('No valid P1 data after %d retries' % p1_client.retries)
+            sys.exit()
 
     # Get extended data
     if verbose:
@@ -132,12 +141,15 @@ def main():
         '22': p1_client.energy / 1000,                                      # Net Energy Consumption [kWh]
         '46': E_cons / 1000,                                                # Local Energy Consumption [kWh]
         '47': E_prod / 1000,                                                # Solar Energy Production [kWh]
-        '23': psutil.cpu_percent(),                                         # Current system-wide CPU utilization [%]
-        '25': psutil.virtual_memory().percent,                              # Current memory usage [%]
-        '26': psutil.disk_usage('/').percent,                               # Current disk usage [%]
-        '27': psutil.sensors_temperatures()['bcm2835_thermal'][0].current,  # Current CPU temperature [C]
-        '28': len(psutil.pids())                                            # Current number of active PIDs [-]
     }
+    if not nuc:
+        payload.update({
+            '23': psutil.cpu_percent(),                                         # Current system-wide CPU utilization [%]
+            '25': psutil.virtual_memory().percent,                              # Current memory usage [%]
+            '26': psutil.disk_usage('/').percent,                               # Current disk usage [%]
+            '27': psutil.sensors_temperatures()['bcm2835_thermal'][0].current,  # Current CPU temperature [C]
+            '28': len(psutil.pids())                                            # Current number of active PIDs [-]
+        })
     if data_guardhouse is not None:
         payload.update({
             '3':  data_guardhouse['temp'],                              # Temperature [C]
@@ -160,6 +172,12 @@ def main():
             '82': owm_client.wind,
             '83': owm_client.pressure
         })
+
+    # Add MQTT retained messages to payload
+    mqtt_payload = mqtt_client.get()
+    payload.update(mqtt_payload)
+    if verbose:
+        print('MQTT payload: %s' % mqtt_payload)
 
     # Post Nebula payload
     if verbose:

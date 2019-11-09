@@ -20,9 +20,9 @@ WiFiClient WifiClient;
 Blink blink(LED_BUILTIN, 1000);     // Blink every second        
 
 // MQTT configuration
-char mqtt_id[] = NODE_UUID;
-IPAddress broker(192,168,1,114); 
-PubSubClient client(WifiClient);
+#define TOPIC_LENGTH 64
+PubSubClient mqtt_client(WifiClient);
+char node_uuid[12];
 
 // S0 configuration
 #define E_PV_RESTORE 1241332                 // Wh
@@ -31,17 +31,16 @@ PubSubClient client(WifiClient);
 #define MIN_PV_DT MS_PER_HOUR / 10           // 10W minimum per ms
 #define MAX_PV_DT MS_PER_HOUR / 2100         // (2kW + 5% margin = 2.1kW) maximum per ms
 #define BUF_LENGTH 5
-#define S0 3
+#define S0_pin 3
 long E_PV_value = E_PV_RESTORE; // Wh
 float P_PV_value = 0;
 float P_PV[BUF_LENGTH]; // W
 int S0_prev_state = 1;
 unsigned long last_pulse = millis();
-const char *energy_topic = mqtt_id + "/mainhouse/energy";
-const char *power_topic = mqtt_id + "/mainhouse/power";
+
 
 // H20 configuration
-#define H2O 2
+#define H2O_pin 2
 int H2O_prev_state = 0;
 float H2O_value = H20_RESTORE;
 const char *H2O_topic = "mainhouse/h2o";
@@ -50,6 +49,13 @@ const char *H2O_topic = "mainhouse/h2o";
 #define IO_COUNT 4 // Light, Light Sensor, H2O, S0
 int IO_pin[IO_COUNT] = {D0, D1, D2, D3};
 int IO_pin_dir[IO_COUNT] = {OUTPUT, INPUT, INPUT, INPUT_PULLUP};
+
+// Nebula configuration
+#define SENSOR_COUNT 3 // H2O, E_PV, P_PV
+#define H2O_sensor 0
+#define E_PV_sensor 1
+#define P_PV_sensor 2
+int sensor_id[SENSOR_COUNT] = {1, 2, 3}
 
 // Numpy
 Numpy np;
@@ -127,12 +133,34 @@ void loop() {
   S0_read(); 
 }
 
-void H2O_read(void) {
-  // Initialize variables
-  char charValue[MAX_LENGTH_SIGNED_INT];
+void mqtt_publish(int id, float value) {
 
+  // MQTT client connection
+  if (!mqtt_client.connected())  // Reconnect if connection is lost
+  {
+    mqtt_reconnect();
+  }
+  mqtt_client.loop();
+
+  // Prepare character arrays
+  char charTopic[TOPIC_LENGTH];
+  char charID[MAX_LENGTH_SIGNED_INT];
+  char charValue[6];
+  strcpy(charTopic, "nodes/");
+  strcat(charTopic, node_uuid);
+  strcat(charTopic, "/");
+  itoa(id, charID, 10);
+  strcat(charTopic, charID);
+  dtostrf(value, 3, 2, charValue);
+
+  // Publish value to topic  
+  mqtt_client.publish(charTopic, charValue);  
+
+}
+
+void H2O_read(void) {
   // Read I/O
-  int H2O_cur_state = digitalRead(IO_pin[H2O]);
+  int H2O_cur_state = digitalRead(IO_pin[H2O_pin]);
   
   // Upward flink
   if(H2O_prev_state == 0)
@@ -140,8 +168,7 @@ void H2O_read(void) {
     if (H2O_cur_state == 1)
     { // Start of pulse detected
       H2O_value += 1;
-      dtostrf(H2O_value, MAX_LENGTH_SIGNED_INT, 0, charValue);
-      client.publish(H2O_topic, charValue);  
+      mqtt_publish(sensor_id[H2O_sensor], H2O_value);  
     }
   }
 
@@ -167,8 +194,7 @@ void S0_read(void) {
     if (S0_cur_state == 0)
     { // Start of pulse detected
       E_PV_value += 1;
-      dtostrf(E_PV_value, MAX_LENGTH_SIGNED_LONG, 0, charValue);
-      client.publish(energy_topic, charValue);  
+      mqtt_publish(E_PV_sensor, E_PV_value);  
       if (delta_t_ms > MAX_PV_DT) // Avoid invalid power calculation
         P_PV_value = filtered_buffer(P_PV, BUF_LENGTH, MS_PER_HOUR / delta_t_ms);
       last_pulse = millis();
@@ -182,8 +208,7 @@ void S0_read(void) {
 
   // If P_PV changed, publish it to MQTT broker
   if (P_PV_value != P_PV_prev_value) {
-    dtostrf(P_PV_value, MAX_LENGTH_SIGNED_LONG, 0, charValue);
-    client.publish(power_topic, charValue);   
+    mqtt_publish(P_PV_sensor, P_PV_value);    
   }
   
   // Store current S0 state for future reference

@@ -24,4 +24,5 @@ config.h
 *test*
 *.ico
 python/random/
+*.egg-info/
 *.key
