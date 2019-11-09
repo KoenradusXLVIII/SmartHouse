@@ -40,23 +40,30 @@ def init_log(log_title):
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
     talk_log('Start of log \'%s\'' % os.path.join(script_path, 'logs', logfileName))
 
-def talk_log(msg, SNR='', level='info', verbose=True):
+def talk_log(msg, level='info', verbose=True, nebula_client=None):
     """ Function to write to log and to screen simultaneously """
-    if SNR:
-        SNR = '[%s] ' % SNR
     if verbose:
-        print('%s%s' % (SNR, msg))
-    if level == 'info':
-        logging.info('%s%s' % (SNR, msg))
+        print(msg)
+    if level == 'debug':
+        logging.debug(msg)
+        if nebula_client:
+            nebula_client.debug(msg)
+    elif level == 'info':
+        logging.info(msg)
+        if nebula_client:
+            nebula_client.info(msg)
     elif level == 'warning':
-        logging.warning('%s%s' % (SNR, msg))
+        logging.warning(msg)
+        if nebula_client:
+            nebula_client.warning(msg)
+    elif level == 'critical':
+        logging.critical(msg)
+        if nebula_client:
+            nebula_client.critical(msg)
     logger = logging.getLogger()
     logger.handlers[0].flush()
 
 def main():
-    # Initialize logging
-    init_log('IPCam deamon')
-
     # Load configuration YAML
     path = os.path.dirname(os.path.realpath(__file__))
     fp = open(path + '/config.yaml', 'r')
@@ -89,27 +96,26 @@ def main():
             else:
                 nebula_client.critical('IPCam deamon with PID %s crashed!' % pid)
 
+    # Initialize logging
+    init_log('IPCam deamon')
+
     # Register current deamon
     with open(pidfile, 'w') as fp:
         pid = str(os.getpid())
-        nebula_client.info('Registering IPCam deamon with PID %s' % pid)
+        talk_log('Registering IPCam deamon with PID %s' % pid, 'info', nebula_client=nebula_client)
         fp.write(pid)
 
     # Set up IPCam clients
     IPCam_motor = IPCam.Client(**cfg['ipcam']['motor'])
-    #IPCam_motor.set_base_path(recording_dir)
+    IPCam_motor.set_base_path(recording_dir)
     IPCam_garden = IPCam.Client(**cfg['ipcam']['garden'])
-    #IPCam_garden.set_base_path(recording_dir)
+    IPCam_garden.set_base_path(recording_dir)
 
     # Set up Pushover client
     pushover_client = pushover.Client(**cfg['pushover'])
 
-    # Set up Arduino clients
-    arduino_motor = arduino.Client(**cfg['arduino']['motor'])
-    arduino_guardhouse = arduino.Client(**cfg['arduino']['guardhouse'])
-
     # Set up Hue client
-    #hue_client = hue.Client(**cfg['hue'])
+    hue_client = hue.Client(**cfg['hue'])
 
     # Local variables
     last_motion = 0
@@ -120,11 +126,9 @@ def main():
         # Check for new motion at Motor IPCam
         if IPCam_motor.new_recording():
             # New motion detected!
-            # Push alarm to smartphone
-            #pushover_client.message('Alarm triggered!', IPCam_motor.snapshot(), 'GuardHouse Security', 'high', 'alien')
-
-            # Push message to Nebula
-            nebula_client.info('Alarm triggered!')
+            # Push alarm to smartphone and log
+            pushover_client.message('Alarm triggered!', IPCam_motor.snapshot(), 'GuardHouse Security', 'high', 'alien')
+            talk_log('Alarm triggered!', 'info', nebula_client=nebula_client)
 
             # Strobe handling
             strobe = ON
@@ -159,11 +163,12 @@ def main():
             # Todo: implement check to verify message received
             mqtt_client.publish(cfg['mqtt']['nodes']['guardhouse'], cfg['mqtt']['sensors']['day_night'], night)
             if night:
-                nebula_client.info('Transition to night written to Arduino Guardhouse')
+                talk_log('Transition to night written to Arduino Guardhouse', 'info', nebula_client=nebula_client)
                 # If no one home turns lights on in 'not home' mode
-                mqtt_client.publish(cfg['mqtt']['nodes']['hue'], 'scene', 'not_home')
+                hue_client.set_scene('Not home')
+                talk_log('Switching lights on to "Not home" mode', 'info', nebula_client=nebula_client)
             else:  # If not night, then day
-                nebula_client.info('Transition to day written to Arduino Guardhouse')
+                talk_log('Transition to day written to Arduino Guardhouse', 'info', nebula_client=nebula_client)
 
 
 
