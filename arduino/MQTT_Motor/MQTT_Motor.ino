@@ -82,8 +82,7 @@ void setup() {
   // Subscribe to my MQTT topic
   char charTopic[20];
   strcpy(charTopic, "nodes/");
-  //strcat(charTopic, node_uuid);
-  strcat(charTopic, "3C71BF315A37");
+  strcat(charTopic, node_uuid);
   strcat(charTopic, "/#");
   if (!mqtt_client.connected())  // Reconnect if connection is lost
     mqtt_reconnect();
@@ -131,7 +130,6 @@ void loop() {
   blink.update();
 
   // MQTT
-  mqtt_publish(TEMP_SENSOR_ID, temp);
   mqtt_client.loop();
 }
 

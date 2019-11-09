@@ -25,7 +25,7 @@ PubSubClient mqtt_client(WifiClient);
 char node_uuid[12];
 
 // DS18B20
-#define BUF_LENGTH 3
+#define BUF_LENGTH 16
 OneWire  ds(D2);  // on pin D2
 byte addr[8] = {0x28, 0xE0, 0xC4, 0x19, 0x17, 0x13, 0x01, 0x76};
 float calibration = 2.0;
@@ -146,7 +146,7 @@ int sensor_id(char* topic) {
 
 void loop() {
   // Blink handling
-  //blink.update();
+  blink.update();
 
   // DS18B20
   float temp = read_filtered_DS18B20(buf_temp, BUF_LENGTH, addr);
