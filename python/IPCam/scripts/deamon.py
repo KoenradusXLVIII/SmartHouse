@@ -18,10 +18,10 @@ import hue
 import MQTT
 
 # Constants
-OFF = "0"
-ON = "1"
-DAY = "0"
-NIGHT = "1"
+OFF = 0
+ON = 1
+DAY = 0
+NIGHT = 1
 
 # Functions
 def log_except_hook(*exc_info):
