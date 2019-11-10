@@ -16,8 +16,9 @@ nebula_client = nebula.Client(**cfg['nebula'])
 
 # The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
-    if not msg.retain:
-        # Only handle new messages
+    if msg.retain:
+        print('%s => %s [retained]' % (msg.topic, msg.payload.decode('UTF-8')))
+    else:
         print('%s => %s' % (msg.topic, msg.payload.decode('UTF-8')))
 
 # Main function

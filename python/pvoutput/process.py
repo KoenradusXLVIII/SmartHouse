@@ -56,7 +56,6 @@ log_client.attach_nebula(nebula_client)
 
 # Set up Arduino API clients
 arduino_guardhouse = arduino.Client(**cfg['arduino']['guardhouse'])
-arduino_mainhouse = arduino.Client(**cfg['arduino']['mainhouse'])
 
 # Set up P1 client
 p1_client = P1.Client('/dev/ttyUSB0')
@@ -71,10 +70,12 @@ def main():
     # Get PV and Water data
     if verbose:
         print('Get PV and Water data...')
-    data_mainhouse = arduino_mainhouse.get_all()
-    if data_mainhouse is not None:
+
+    mqtt_payload = mqtt_client.get(filter=[6, 7, 47])
+
+    if len(mqtt_payload):
         # Post-process water data
-        data_mainhouse['H2O'] = dx(data_mainhouse['H2O'], 'H2O')
+        H20 = dx(mqtt_payload['7'], 'H2O')
     else:
         log_client.error('No data received from Main House')
         sys.exit()
@@ -106,16 +107,16 @@ def main():
         'd': datetime.datetime.today().strftime('%Y%m%d'),              # Date [yyyymmdd]
         't': datetime.datetime.today().strftime('%H:%M'),               # Time [hh:mm]
         'c1': 1,                                                        # Cumulative Flag [-]
-        'v1': data_mainhouse['E_PV'],                                   # Energy Generation [Wh]
-        'v2': data_mainhouse['P_PV'],                                   # Power Generation [W]
-        'v3': data_mainhouse['E_PV'] + p1_client.energy,                # Energy Consumption [Wh]
-        'v4': data_mainhouse['P_PV'] + p1_client.power,                 # Power Consumption [W]
+        'v1': mqtt_payload['47'],                                       # Energy Generation [Wh]
+        'v2': mqtt_payload['6'],                                        # Power Generation [W]
+        'v3': mqtt_payload['47'] + p1_client.energy,                    # Energy Consumption [Wh]
+        'v4': mqtt_payload['6'] + p1_client.power,                      # Power Consumption [W]
     }
     if data_guardhouse is not None:
         payload.update({
             'v7': data_guardhouse['temp'],                              # Temperature [C]
             'v8': data_guardhouse['humi'],                              # Humidity [%]
-            'v9': data_mainhouse['H2O'],                                # Water Consumption [l]
+            'v9': H20,                                                  # Water Consumption [l]
             'v11': data_guardhouse['rain'],                             # Precipitation [mm]
             'v12': data_guardhouse['soil_humi']                         # Soil Humidity [%]
         })
@@ -130,8 +131,8 @@ def main():
         log_client.debug('PVOutput payload: %s' % payload)
 
     # Prepare Nebula payload
-    E_prod = data_mainhouse['E_PV']                                         # Solar Energy Production [Wh]
-    E_cons = data_mainhouse['E_PV'] + p1_client.energy                      # Local Energy Consumption [Wh]
+    E_prod = mqtt_payload['47']                                             # Solar Energy Production [Wh]
+    E_cons = mqtt_payload['47'] + p1_client.energy                           # Local Energy Consumption [Wh]
     P_prod = dxdt(E_prod, 'E_prod') * 3600                                  # Solar Energy Production [W]
     P_cons = dxdt(E_cons, 'E_cons') * 3600                                  # Local Energy Consumption [W]
 
@@ -154,7 +155,7 @@ def main():
         payload.update({
             '3':  data_guardhouse['temp'],                              # Temperature [C]
             '4':  data_guardhouse['humi'],                              # Humidity [%]
-            '7':  data_mainhouse['H2O'],                                # Water Consumption [l]
+            '7':  H20,                                                  # Water Consumption [l]
             '8':  data_guardhouse['rain'],                              # Precipitation [mm]
             '9':  data_guardhouse['soil_humi'],                         # Soil Humidity [%]
             '10': data_guardhouse['door_state'],                        # Door State [Open/Closed]
@@ -173,8 +174,10 @@ def main():
             '83': owm_client.pressure
         })
 
-    # Add MQTT retained messages to payload
-    mqtt_payload = mqtt_client.get()
+    # Add MQTT selected retained messages to payload
+    mqtt_payload = mqtt_client.get(filter=[19, 90])
+    payload.update(mqtt_payload)
+    mqtt_payload = mqtt_client.get(filter=85, type='float')
     payload.update(mqtt_payload)
     if verbose:
         print('MQTT payload: %s' % mqtt_payload)

@@ -111,6 +111,9 @@ def main():
     IPCam_garden = IPCam.Client(**cfg['ipcam']['garden'])
     IPCam_garden.set_base_path(recording_dir)
 
+    # Set up Guard House Arduino client
+    arduino_guardhouse = arduino.Client(**cfg['arduino']['guardhouse'])
+
     # Set up Pushover client
     pushover_client = pushover.Client(**cfg['pushover'])
 
@@ -123,8 +126,8 @@ def main():
     motor_light = 0
 
     while True:
-        # Check for new motion at Motor IPCam
-        if IPCam_motor.new_recording():
+        # Check for new motion at Motor IPCam, unless the alarm is on
+        if IPCam_motor.new_recording() and not strobe:
             # New motion detected!
             # Push alarm to smartphone and log
             pushover_client.message('Alarm triggered!', IPCam_motor.snapshot(), 'GuardHouse Security', 'high', 'alien')
@@ -158,10 +161,11 @@ def main():
                         mqtt_client.publish(cfg['mqtt']['nodes']['motor'], cfg['mqtt']['sensors']['motor_light'], OFF)
 
         # Check for day/night transitions
-        night = IPCam_motor.delta_day_night()
+        night = IPCam_garden.delta_day_night()
         if night is not None:
-            # Todo: implement check to verify message received
             mqtt_client.publish(cfg['mqtt']['nodes']['guardhouse'], cfg['mqtt']['sensors']['day_night'], night)
+            arduino_guardhouse.set_value('day_night', night) # Todo: remove after guardhouse upgrade to MQTT
+
             if night:
                 talk_log('Transition to night written to Arduino Guardhouse', 'info', nebula_client=nebula_client)
                 # If no one home turns lights on in 'not home' mode

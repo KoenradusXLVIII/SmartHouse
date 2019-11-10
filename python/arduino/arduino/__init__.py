@@ -16,7 +16,7 @@ class Client:
                 return float(r[var.lower()])
             else:
                 return None
-        except (requests.exceptions.ConnectionError, requests.exceptions.ConnectTimeout, requests.ReadTimeout):
+        except (requests.exceptions.ConnectionError, requests.exceptions.ConnectTimeout):
             if itt < self.retries:
                 self.get_value(var, itt + 1)
             else:
@@ -31,7 +31,7 @@ class Client:
                 return r
             else:
                 return None
-        except (requests.exceptions.ConnectionError, requests.exceptions.ConnectTimeout, requests.ReadTimeout):
+        except (requests.exceptions.ConnectionError, requests.exceptions.ConnectTimeout):
             if itt < self.retries:
                 self.get_all(itt + 1)
             else:
@@ -50,7 +50,7 @@ class Client:
             else:
                 return None
 
-        except (requests.exceptions.ConnectionError, requests.exceptions.ConnectTimeout, requests.ReadTimeout):
+        except (requests.exceptions.ConnectionError, requests.exceptions.ConnectTimeout):
             if itt < self.retries:
                 self.set_value(var, value, itt + 1)
             else:
