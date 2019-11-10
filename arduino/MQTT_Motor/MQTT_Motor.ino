@@ -1,7 +1,6 @@
 // Public libraries
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
-#include <OneWire.h>
 
 // Private libraries
 #include <Blink.h>
@@ -23,15 +22,15 @@ Blink blink(LED_BUILTIN, 1000);     // Blink every second
 #define TOPIC_LENGTH 64
 PubSubClient mqtt_client(WifiClient);
 char node_uuid[12];
+char charTopic[20];
 
 // Numpy
 Numpy np;
 
 // Nebula configuration
-#define TEMP_SENSOR_ID 85
 #define IO_COUNT 2
 int IO_ID[IO_COUNT] = {19, 90};
-int IO_PIN[IO_COUNT] = {D0, D1};
+int IO_pin[IO_COUNT] = {D0, D1};
 
 // Global timing
 #define UPLOAD_RATE 1                                             // Upload every x minutes
@@ -80,15 +79,20 @@ void setup() {
   array_to_string(mac, 6, node_uuid);
 
   // Subscribe to my MQTT topic
-  char charTopic[20];
   strcpy(charTopic, "nodes/");
   strcat(charTopic, node_uuid);
   strcat(charTopic, "/#");
-  if (!mqtt_client.connected())  // Reconnect if connection is lost
-    mqtt_reconnect();
+  
+  mqtt_reconnect();
   mqtt_client.subscribe(charTopic);
   Serial.print("Subscribing to topic: ");
   Serial.println(charTopic);
+
+  // Set I/O
+  for (int i = 0; i < IO_COUNT; i++) {
+    pinMode(IO_pin[i], OUTPUT);
+    digitalWrite(IO_pin[i], LOW);
+  }
 }
 
 // MQTT callback triggered on message received
@@ -100,6 +104,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
     charPayload[i] = (char)payload[i];
 
   sscanf(charPayload, "%d", &intValue);
+  Serial.print("Received message on topic: ");
+  Serial.print(topic);
+  Serial.print(" => ");
+  Serial.println(intValue);
   process_cmd(sensor_id(topic), intValue);
 }
 
@@ -107,7 +115,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 void process_cmd(int intSensorID, int intValue) {
   for (int i = 0; i < IO_COUNT; i++) {
     if (IO_ID[i] == intSensorID)
-      digitalWrite(IO_PIN[i], !intValue);
+      digitalWrite(IO_pin[i], intValue);
   }
 }
 
@@ -130,6 +138,9 @@ void loop() {
   blink.update();
 
   // MQTT
+  if (mqtt_reconnect())
+    // Need to resubscribe to topic after reconnect!
+    mqtt_client.subscribe(charTopic);
   mqtt_client.loop();
 }
 
@@ -147,16 +158,22 @@ void array_to_string(byte array[], unsigned int len, char buffer[])
 }
 
 // Reconnect to client
-void mqtt_reconnect() {
+bool mqtt_reconnect() {
+  bool has_reconnected = false;
   // Loop until we're reconnected
   while (!mqtt_client.connected()) {
+    has_reconnected = true;
+    Serial.print("MQTT client reconnecting...");
     // Attempt to connect
     if (mqtt_client.connect(node_uuid, MQTT_USER, MQTT_API_KEY)) {
+      Serial.println(" OK");      
     } else {
       // Wait 5 seconds before retrying
+      Serial.print(" retry...");
       delay(5000);
     }
   }
+  return has_reconnected;
 }
 
 // Publish once every x minutes
@@ -168,8 +185,7 @@ void mqtt_publish(int id, float value) {
     longPrevious = longNow;
 
     // MQTT client connection
-    if (!mqtt_client.connected())  // Reconnect if connection is lost
-      mqtt_reconnect();
+    mqtt_reconnect();
       
     // Parse topic and value data
     char charTopic[TOPIC_LENGTH];
