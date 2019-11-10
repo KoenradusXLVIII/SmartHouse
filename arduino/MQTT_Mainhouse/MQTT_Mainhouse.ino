@@ -32,7 +32,7 @@ char charTopic[20];
 #define MIN_PV_DT MS_PER_HOUR / 10           // 10W minimum per ms
 #define MAX_PV_DT MS_PER_HOUR / 2100         // (2kW + 5% margin = 2.1kW) maximum per ms
 #define BUF_LENGTH 5
-#define S0_pin D0
+#define S0_pin D3                            // Has to have pullup!
 #define E_PV_ID 47
 #define P_PV_ID 6
 long E_PV_value = E_PV_RESTORE; // Wh
@@ -91,8 +91,12 @@ void setup() {
   array_to_string(mac, 6, node_uuid);
 
   // Setup I/O
-  pinMode(S0_pin, INPUT);
-  pinMode(H2O_pin, INPUT_PULLUP);
+  pinMode(S0_pin, INPUT_PULLUP);
+  pinMode(H2O_pin, INPUT);
+  
+  // Set up additional GND
+  pinMode(D2, OUTPUT);
+  digitalWrite(D2, LOW);
 }
 
 void loop() {
@@ -188,6 +192,7 @@ void S0_read(void) {
   
   // Read input pin
   int S0_cur_state = digitalRead(S0_pin);
+  //Serial.println(S0_cur_state);
 
   // Compute time difference
   unsigned long delta_t_ms = millis()-last_pulse; // ms
@@ -224,6 +229,9 @@ float filtered_buffer(float *buf_data, float buf_length, float value) {
   for (int n = (buf_length - 1); n > 0; n--) {
     buf_data[n] = buf_data[n - 1];
   }
+
+  // Append new data
+  buf_data[0] = value;
 
   // Return filtered mean (1 stdev)
   return np.filt_mean(buf_data, buf_length, 1); 
