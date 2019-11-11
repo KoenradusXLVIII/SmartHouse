@@ -169,8 +169,9 @@ def main():
             if night:
                 talk_log('Transition to night written to Arduino Guardhouse', 'info', nebula_client=nebula_client)
                 # If no one home turns lights on in 'not home' mode
-                hue_client.set_scene('Not home')
-                talk_log('Switching lights on to "Not home" mode', 'info', nebula_client=nebula_client)
+                if hue_client.get_all_off():
+                    hue_client.set_scene('Not home')
+                    talk_log('Switching lights on to "Not home" mode', 'info', nebula_client=nebula_client)
             else:  # If not night, then day
                 talk_log('Transition to day written to Arduino Guardhouse', 'info', nebula_client=nebula_client)
 

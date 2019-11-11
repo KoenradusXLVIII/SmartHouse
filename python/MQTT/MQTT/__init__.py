@@ -60,7 +60,7 @@ class Client:
 
         #print('Active filter: %s' % filter)
 
-        self._mqtt_client.connect(self._host)
+        self._mqtt_client.connect(self._host, self._port)
         for topic in self._topics:
             self._mqtt_client.subscribe(topic)
         self._mqtt_client.loop_start()
@@ -80,7 +80,7 @@ class Client:
 
     def publish(self, node, sensor_id, value):
         topic = 'nodes/%s/%s' % (node, sensor_id)
-        self._mqtt_client.connect(self._host)
+        self._mqtt_client.connect(self._host, self._port)
         self._mqtt_client.publish(topic, value, retain=True)
         self._mqtt_client.disconnect()
         print(topic, value)

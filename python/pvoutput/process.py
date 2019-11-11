@@ -75,7 +75,7 @@ def main():
 
     if len(mqtt_payload):
         # Post-process water data
-        H20 = dx(mqtt_payload['7'], 'H2O')
+        H2O = dx(mqtt_payload['7'], 'H2O')
     else:
         log_client.error('No data received from Main House')
         sys.exit()
@@ -111,12 +111,12 @@ def main():
         'v2': mqtt_payload['6'],                                        # Power Generation [W]
         'v3': mqtt_payload['47'] + p1_client.energy,                    # Energy Consumption [Wh]
         'v4': mqtt_payload['6'] + p1_client.power,                      # Power Consumption [W]
+        'v9': H2O                                                       # Water Consumption [l]
     }
     if data_guardhouse is not None:
         payload.update({
             'v7': data_guardhouse['temp'],                              # Temperature [C]
             'v8': data_guardhouse['humi'],                              # Humidity [%]
-            'v9': H20,                                                  # Water Consumption [l]
             'v11': data_guardhouse['rain'],                             # Precipitation [mm]
             'v12': data_guardhouse['soil_humi']                         # Soil Humidity [%]
         })
@@ -142,6 +142,7 @@ def main():
         '22': p1_client.energy / 1000,                                      # Net Energy Consumption [kWh]
         '46': E_cons / 1000,                                                # Local Energy Consumption [kWh]
         '47': E_prod / 1000,                                                # Solar Energy Production [kWh]
+        '7': H2O                                                            # Water Consumption [l]
     }
     if not nuc:
         payload.update({
@@ -155,7 +156,6 @@ def main():
         payload.update({
             '3':  data_guardhouse['temp'],                              # Temperature [C]
             '4':  data_guardhouse['humi'],                              # Humidity [%]
-            '7':  H20,                                                  # Water Consumption [l]
             '8':  data_guardhouse['rain'],                              # Precipitation [mm]
             '9':  data_guardhouse['soil_humi'],                         # Soil Humidity [%]
             '10': data_guardhouse['door_state'],                        # Door State [Open/Closed]
