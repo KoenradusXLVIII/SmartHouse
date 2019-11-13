@@ -26,8 +26,8 @@ char node_uuid[12];
 char charTopic[20];
 
 // S0 configuration
-#define E_PV_RESTORE 1456194                 // Wh
-#define H20_RESTORE 33508                    // l
+#define E_PV_RESTORE 1458230                 // Wh
+#define H20_RESTORE 33671                    // l
 #define MS_PER_HOUR 3600000                  // ms
 #define MIN_PV_DT MS_PER_HOUR / 10           // 10W minimum per ms
 #define MAX_PV_DT MS_PER_HOUR / 2100         // (2kW + 5% margin = 2.1kW) maximum per ms
@@ -83,7 +83,7 @@ void setup() {
   setup_wifi();
 
   // Setup MQTT broker connection
-  mqtt_client.setServer(broker, 1883);
+  mqtt_client.setServer(broker, port);
 
   // Extract node UUID
   byte mac[6];
@@ -141,7 +141,7 @@ void mqtt_reconnect() {
 }
 
 
-void mqtt_publish(int id, float value) {
+void mqtt_publish(int id, int value) {
   // MQTT client connection
   if (!mqtt_client.connected())  // Reconnect if connection is lost
     mqtt_reconnect();
@@ -155,7 +155,7 @@ void mqtt_publish(int id, float value) {
   strcat(charTopic, "/");
   itoa(id, charID, 10);
   strcat(charTopic, charID);
-  dtostrf(value, 3, 0, charValue);
+  itoa(value, charValue, 10);
 
   Serial.print("MQTT upload on topic: ");
   Serial.print(charTopic);
@@ -217,7 +217,7 @@ void S0_read(void) {
 
   // If P_PV changed, publish it to MQTT broker
   if (P_PV_value != P_PV_prev_value) {
-    mqtt_publish(P_PV_ID, P_PV_value);    
+    mqtt_publish(P_PV_ID, (int) P_PV_value);    
   }
   
   // Store current S0 state for future reference
