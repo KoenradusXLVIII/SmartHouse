@@ -30,9 +30,14 @@ class Numpy
 {
   public:
     Numpy(); // Constructor
+    void add_to_buffer(float new_data, float *buf_data, int buf_length);
+    void add_to_buffer(int new_data, int *buf_data, int buf_length);
     float filt_mean(float *buf_data, int buf_length, int nr_std);
+    int filt_mean(int *buf_data, int buf_length, int nr_std);
     float mean(float *buf_data, int buf_length);
+    int mean(int *buf_data, int buf_length);
     float std(float *buf_data, int buf_length);
+    int std(int *buf_data, int buf_length);
   private:
     // Empty
 };

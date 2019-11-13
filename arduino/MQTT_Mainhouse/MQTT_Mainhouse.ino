@@ -35,9 +35,9 @@ char charTopic[20];
 #define S0_pin D3                            // Has to have pullup!
 #define E_PV_ID 47
 #define P_PV_ID 6
-long E_PV_value = E_PV_RESTORE; // Wh
-float P_PV_value = 0;
-float P_PV[BUF_LENGTH]; // W
+int E_PV_value = E_PV_RESTORE; // Wh
+int P_PV_value = 0;
+int P_PV[BUF_LENGTH]; // W
 int S0_prev_state = 1;
 unsigned long last_pulse = millis();
 
@@ -71,7 +71,7 @@ void setup_wifi() {
   Serial.println(F(""));
   Serial.print(F("IP Address: "));
   Serial.println(WiFi.localIP());
-  Serial.print("MAC: ");
+  Serial.print(F("MAC: "));
   Serial.println(WiFi.macAddress());
 }
 
@@ -128,20 +128,44 @@ void array_to_string(byte array[], unsigned int len, char buffer[])
 void mqtt_reconnect() {
   // Loop until we're reconnected
   while (!mqtt_client.connected()) {
-    Serial.print("Attempting MQTT connection...");
+    Serial.print(F("Attempting MQTT connection..."));
     // Attempt to connect
     if (mqtt_client.connect(node_uuid, MQTT_USER, MQTT_API_KEY)) {
-      Serial.println("connected");
+      Serial.println(F("connected"));
     } else {
-      Serial.println(" try again in 5 seconds");
+      Serial.println(F(" try again in 5 seconds"));
       // Wait 5 seconds before retrying
       delay(5000);
     }
   }
 }
 
+void mqtt_publish(int id, float value) {
+  // Publish float
+  // MQTT client connection
+  if (!mqtt_client.connected())  // Reconnect if connection is lost
+    mqtt_reconnect();
+
+  // Publish value
+  char charTopic[TOPIC_LENGTH];
+  char charID[MAX_LENGTH_SIGNED_INT];
+  char charValue[6];
+  strcpy(charTopic, (const char *) F("nodes/"));
+  strcat(charTopic, node_uuid);
+  strcat(charTopic, (const char *) F("/sensors/"));
+  itoa(id, charID, 10);
+  strcat(charTopic, charID);
+  dtostrf(value, 1, 2, charValue);
+
+  Serial.print(F("MQTT upload on topic: "));
+  Serial.print(charTopic);
+  Serial.print(F(" => "));
+  Serial.println(charValue);
+  mqtt_client.publish(charTopic, charValue, true);
+}
 
 void mqtt_publish(int id, int value) {
+  // Publish int
   // MQTT client connection
   if (!mqtt_client.connected())  // Reconnect if connection is lost
     mqtt_reconnect();
@@ -150,16 +174,16 @@ void mqtt_publish(int id, int value) {
   char charTopic[TOPIC_LENGTH];
   char charID[MAX_LENGTH_SIGNED_INT];
   char charValue[6];
-  strcpy(charTopic, "nodes/");
+  strcpy(charTopic, (const char *) F("nodes/"));
   strcat(charTopic, node_uuid);
-  strcat(charTopic, "/");
+  strcat(charTopic, (const char *) F("/sensors/"));
   itoa(id, charID, 10);
   strcat(charTopic, charID);
-  itoa(value, charValue, 10);
+  dtostrf(value, 1, 2, charValue);
 
-  Serial.print("MQTT upload on topic: ");
+  Serial.print(F("MQTT upload on topic: "));
   Serial.print(charTopic);
-  Serial.print(" => ");
+  Serial.print(F(" => "));
   Serial.println(charValue);
   mqtt_client.publish(charTopic, charValue, true);  
 }
@@ -192,7 +216,6 @@ void S0_read(void) {
   
   // Read input pin
   int S0_cur_state = digitalRead(S0_pin);
-  //Serial.println(S0_cur_state);
 
   // Compute time difference
   unsigned long delta_t_ms = millis()-last_pulse; // ms
@@ -205,34 +228,26 @@ void S0_read(void) {
       E_PV_value += 1;
       mqtt_publish(E_PV_ID, E_PV_value);  
       if (delta_t_ms > MAX_PV_DT) // Avoid invalid power calculation
-        P_PV_value = filtered_buffer(P_PV, BUF_LENGTH, MS_PER_HOUR / delta_t_ms);
+      {
+          np.add_to_buffer(MS_PER_HOUR / delta_t_ms, P_PV, BUF_LENGTH);
+          P_PV_value = np.filt_mean(P_PV, BUF_LENGTH, 1);
+      }
       last_pulse = millis();
     }
   } 
 
   // If no pulse within time-out window assume
   // power below minimum power, write 0 to buffer
-  if (delta_t_ms > MIN_PV_DT)
-    P_PV_value = filtered_buffer(P_PV, BUF_LENGTH, 0);
+  if (delta_t_ms > MIN_PV_DT) {
+    np.add_to_buffer(0, P_PV, BUF_LENGTH);
+    P_PV_value = np.filt_mean(P_PV, BUF_LENGTH, 1);
+  }
 
   // If P_PV changed, publish it to MQTT broker
   if (P_PV_value != P_PV_prev_value) {
-    mqtt_publish(P_PV_ID, (int) P_PV_value);    
+    mqtt_publish(P_PV_ID, P_PV_value);
   }
   
   // Store current S0 state for future reference
   S0_prev_state = S0_cur_state;
-}
-
-float filtered_buffer(float *buf_data, float buf_length, float value) {
-  // Shift buffer
-  for (int n = (buf_length - 1); n > 0; n--) {
-    buf_data[n] = buf_data[n - 1];
-  }
-
-  // Append new data
-  buf_data[0] = value;
-
-  // Return filtered mean (1 stdev)
-  return np.filt_mean(buf_data, buf_length, 1); 
 }

@@ -135,6 +135,7 @@ def main():
     E_cons = mqtt_payload['47'] + p1_client.energy                           # Local Energy Consumption [Wh]
     P_prod = dxdt(E_prod, 'E_prod') * 3600                                  # Solar Energy Production [W]
     P_cons = dxdt(E_cons, 'E_cons') * 3600                                  # Local Energy Consumption [W]
+    mqtt_client.publish('B827EBF288F8', 5, int(P_cons))
 
     payload = {
         '6':  P_prod,                                                       # 5 minute average Solar Energy Production [W]
