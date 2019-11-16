@@ -15,6 +15,8 @@
 char ssid[] = WIFI_SSID;
 char pass[] = WIFI_PASSWD;
 WiFiClient WifiClient;
+float buf_rssi[BUF_LENGTH];
+long prev_rssi = 0;
 
 // Blink configuration
 Blink blink(LED_BUILTIN, 1000);     // Blink every second   
@@ -25,7 +27,6 @@ PubSubClient mqtt_client(WifiClient);
 char node_uuid[12];
 
 // DS18B20
-#define BUF_LENGTH 16
 OneWire  ds(D2);  // on pin D2
 byte addr[8] = {0x28, 0xE0, 0xC4, 0x19, 0x17, 0x13, 0x01, 0x76};
 float calibration = 2.0;
@@ -96,11 +97,12 @@ void setup() {
   Serial.print("Subscribing to topic: ");
   Serial.println(charTopic);
 
-  // Fill DS18B20 buffer
-  Serial.print(F("Initializing DS18B20 buffer"));
+  // Fill buffers
+  Serial.print(F("Initializing buffers"));
   for (int i = 0; i<BUF_LENGTH; i++)
   {
     float temp = read_filtered_DS18B20(buf_temp, BUF_LENGTH, addr);  
+    long rssi = read_filtered_RSSI(buf_rssi, BUF_LENGTH);
     Serial.print(F("."));
   }
   Serial.println(F(""));
@@ -152,8 +154,33 @@ void loop() {
 
   // MQTT
   mqtt_publish(TEMP_SENSOR_ID, temp);
+  mqtt_publish_rssi();
   mqtt_client.loop();
 
+}
+
+void mqtt_publish_rssi(void)
+{ 
+  long rssi = read_filtered_RSSI(buf_rssi, BUF_LENGTH);
+  
+  if (prev_rssi != rssi) {
+    prev_rssi = rssi;
+    // MQTT client connection
+    if (!mqtt_client.connected())  // Reconnect if connection is lost
+      mqtt_reconnect();
+      
+    // Publish value
+    char charTopic[TOPIC_LENGTH];
+    char charValue[3];
+    strcpy(charTopic, "nodes/");
+    strcat(charTopic, node_uuid);
+    strcat(charTopic, "/rssi");
+    itoa(rssi, charValue, 10);
+
+    Serial.print("MQTT upload of RSSI: ");
+    Serial.println(charValue);
+    mqtt_client.publish(charTopic, charValue, true);    
+  }
 }
 
 void array_to_string(byte array[], unsigned int len, char buffer[])
@@ -205,12 +232,25 @@ void mqtt_publish(int id, float value) {
     strcat(charTopic, "/");
     itoa(id, charID, 10);
     strcat(charTopic, charID);
-    dtostrf(value, 3, 2, charValue);
+    dtostrf(value, 1, 2, charValue);
 
     Serial.print("MQTT upload of temperature: ");
     Serial.println(charValue);
     mqtt_client.publish(charTopic, charValue, true);  
   }
+}
+
+long read_filtered_RSSI(float *buf_data, int buf_length) {
+  // Shift buffer
+  for (int n = (buf_length - 1); n > 0; n--) {
+    buf_data[n] = buf_data[n - 1];
+  }
+
+  // Append new data
+  buf_data[0] = WiFi.RSSI();
+
+  // Return filtered mean (1 stdev)
+  return (long) np.filt_mean(buf_data, buf_length, 1);
 }
 
 float read_filtered_DS18B20(float *buf_data, int buf_length, byte *addr) {

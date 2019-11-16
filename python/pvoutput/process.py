@@ -102,33 +102,34 @@ def main():
         'X-Pvoutput-SystemId': cfg['pvoutput']['sid']
     }
 
-    # Prepare PVOutput payload
-    payload = {
-        'd': datetime.datetime.today().strftime('%Y%m%d'),              # Date [yyyymmdd]
-        't': datetime.datetime.today().strftime('%H:%M'),               # Time [hh:mm]
-        'c1': 1,                                                        # Cumulative Flag [-]
-        'v1': mqtt_payload['47'],                                       # Energy Generation [Wh]
-        'v2': mqtt_payload['6'],                                        # Power Generation [W]
-        'v3': mqtt_payload['47'] + p1_client.energy,                    # Energy Consumption [Wh]
-        'v4': mqtt_payload['6'] + p1_client.power,                      # Power Consumption [W]
-        'v9': H2O                                                       # Water Consumption [l]
-    }
-    if data_guardhouse is not None:
-        payload.update({
-            'v7': data_guardhouse['temp'],                              # Temperature [C]
-            'v8': data_guardhouse['humi'],                              # Humidity [%]
-            'v11': data_guardhouse['rain'],                             # Precipitation [mm]
-            'v12': data_guardhouse['soil_humi']                         # Soil Humidity [%]
-        })
+    if not nuc:
+        # Prepare PVOutput payload
+        payload = {
+            'd': datetime.datetime.today().strftime('%Y%m%d'),              # Date [yyyymmdd]
+            't': datetime.datetime.today().strftime('%H:%M'),               # Time [hh:mm]
+            'c1': 1,                                                        # Cumulative Flag [-]
+            'v1': mqtt_payload['47'],                                       # Energy Generation [Wh]
+            'v2': mqtt_payload['6'],                                        # Power Generation [W]
+            'v3': mqtt_payload['47'] + p1_client.energy,                    # Energy Consumption [Wh]
+            'v4': mqtt_payload['6'] + p1_client.power,                      # Power Consumption [W]
+            'v9': H2O                                                       # Water Consumption [l]
+        }
+        if data_guardhouse is not None:
+            payload.update({
+                'v7': data_guardhouse['temp'],                              # Temperature [C]
+                'v8': data_guardhouse['humi'],                              # Humidity [%]
+                'v11': data_guardhouse['rain'],                             # Precipitation [mm]
+                'v12': data_guardhouse['soil_humi']                         # Soil Humidity [%]
+            })
 
-    # Post PVOutput payload
-    if not local:
-        if verbose:
-            print('Post PVOutput payload..')
-            print('PVOutput payload: %s' % payload)
-        r = requests.post(cfg['pvoutput']['url'], headers=headers, params=payload)
-        log_client.info('PVOutput energy data upload: %s' % r.text)
-        log_client.debug('PVOutput payload: %s' % payload)
+        # Post PVOutput payload
+        if not local:
+            if verbose:
+                print('Post PVOutput payload..')
+                print('PVOutput payload: %s' % payload)
+            r = requests.post(cfg['pvoutput']['url'], headers=headers, params=payload)
+            log_client.info('PVOutput energy data upload: %s' % r.text)
+            log_client.debug('PVOutput payload: %s' % payload)
 
     # Prepare Nebula payload
     E_prod = mqtt_payload['47']                                             # Solar Energy Production [Wh]
@@ -175,9 +176,7 @@ def main():
         })
 
     # Add MQTT selected retained messages to payload
-    mqtt_payload = mqtt_client.get(filter=[19, 90])
-    payload.update(mqtt_payload)
-    mqtt_payload = mqtt_client.get(filter=85, type='float')
+    mqtt_payload = mqtt_client.get(filter=[19, 90, 85], type='float')
     payload.update(mqtt_payload)
     if verbose:
         print('MQTT payload: %s' % mqtt_payload)
