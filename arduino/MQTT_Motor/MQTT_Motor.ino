@@ -70,7 +70,7 @@ void setup() {
   setup_wifi();
 
   // Setup MQTT broker connection
-  mqtt_client.setServer(broker, 1883);
+  mqtt_client.setServer(broker, port);
   mqtt_client.setCallback(callback);
 
   // Extract node UUID
