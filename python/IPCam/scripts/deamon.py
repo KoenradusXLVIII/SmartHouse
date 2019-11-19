@@ -111,9 +111,6 @@ def main():
     IPCam_garden = IPCam.Client(**cfg['ipcam']['garden'])
     IPCam_garden.set_base_path(recording_dir)
 
-    # Set up Guard House Arduino client
-    arduino_guardhouse = arduino.Client(**cfg['arduino']['guardhouse'])
-
     # Set up Pushover client
     pushover_client = pushover.Client(**cfg['pushover'])
 
@@ -126,16 +123,20 @@ def main():
     motor_light = 0
 
     while True:
-        # Check for new motion at Motor IPCam, unless the alarm is on
-        if IPCam_motor.new_recording() and not strobe:
+        # Check for new motion at Motor IPCam, unless the alarm or the light is already on
+        if IPCam_motor.new_recording() and not (strobe or motor_light):
             # New motion detected!
-            # Push alarm to smartphone and log
-            pushover_client.message('Alarm triggered!', IPCam_motor.snapshot(), 'GuardHouse Security', 'high', 'alien')
-            talk_log('Alarm triggered!', 'info', nebula_client=nebula_client)
+            # Is the alarm enabled?
 
-            # Strobe handling
-            strobe = ON
-            mqtt_client.publish(cfg['mqtt']['nodes']['motor'], cfg['mqtt']['sensors']['strobe'], ON)
+            alarm_mode = mqtt_client.get_single(cfg['mqtt']['sensors']['alarm_mode'])
+            if alarm_mode:
+                # Push alarm to smartphone and log
+                pushover_client.message('Alarm triggered!', IPCam_motor.snapshot(), 'GuardHouse Security', 'high', 'alien')
+                talk_log('Alarm triggered!', 'info', nebula_client=nebula_client)
+
+                # Strobe handling
+                strobe = ON
+                mqtt_client.publish(cfg['mqtt']['nodes']['motor'], cfg['mqtt']['sensors']['strobe'], ON)
 
             # Light handling
             day_night = mqtt_client.get_single(cfg['mqtt']['sensors']['day_night'])
@@ -145,8 +146,8 @@ def main():
                 mqtt_client.publish(cfg['mqtt']['nodes']['motor'], cfg['mqtt']['sensors']['motor_light'], ON)
 
             last_motion = time.time()
-        elif strobe:
-            # Alarm is on, but is motion still ongoing?
+        elif strobe or motor_light:
+            # Alarm or the light is on, but is motion still ongoing?
             if IPCam_motor.motion_detect():
                 # Motion still ongoing
                 last_motion = time.time()
@@ -164,7 +165,6 @@ def main():
         night = IPCam_garden.delta_day_night()
         if night is not None:
             mqtt_client.publish(cfg['mqtt']['nodes']['guardhouse'], cfg['mqtt']['sensors']['day_night'], night)
-            arduino_guardhouse.set_value('day_night', night) # Todo: remove after guardhouse upgrade to MQTT
 
             if night:
                 talk_log('Transition to night written to Arduino Guardhouse', 'info', nebula_client=nebula_client)

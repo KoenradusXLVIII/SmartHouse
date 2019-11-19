@@ -46,7 +46,7 @@ class Client:
         return rv
 
     def _trail(self, msg, level):
-        url = self.url + '/api/graph/trail.php'
+        url = self.url + 'api/trail.php'
         data = self.auth.copy()
         data['level'] = _levelToName[level]
         data['message'] = json.dumps(msg).strip('"')
@@ -90,10 +90,11 @@ class Client:
         return r
 
     def post(self):
-        url = self.url + '/api/graph/post.php'
+        url = self.url + '/api/post.php'
         data = self.auth.copy()
         data['values'] = self.payload
         r = requests.post(url, json=data)
+        print(r.text)
         self.clear()
         return r
 
