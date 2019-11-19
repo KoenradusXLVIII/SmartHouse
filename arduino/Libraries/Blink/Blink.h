@@ -26,10 +26,13 @@ SOFTWARE.
 
 #include "Arduino.h"
 
+#define DEFAULT_INTERVAL 1000
+
 class Blink
 {
   public:
-    Blink(const int intPin, const long longInterval);  // Constructor
+    Blink(const int intPin);
+    void set_interval(const long longInterval);
     void update(void);
   private:
     // Functions

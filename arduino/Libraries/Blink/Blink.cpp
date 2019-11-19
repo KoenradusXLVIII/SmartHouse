@@ -26,16 +26,21 @@ SOFTWARE.
 #include "Blink.h"
 
 // Constructor
-Blink::Blink(const int intPin, const long longInterval)
-{  
+Blink::Blink(const int intPin)
+{
     pinMode(intPin, OUTPUT);
-    _intPin = intPin;
-    _longInterval = longInterval;
+    _intPin = intPin;    
+    _longInterval = DEFAULT_INTERVAL;
 }
 
 //
 // Public functions
 //
+
+void Blink::set_interval(const long longInterval)
+{
+    _longInterval = longInterval;
+}
 
 void Blink::update(void)
 {

@@ -2,6 +2,7 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include <OneWire.h>
+#include <EEPROM.h>
 
 // Private libraries
 #include <Blink.h>
@@ -12,12 +13,14 @@
 #include "aliases.h"
 
 // WiFi client configuration
-char ssid[] = WIFI_SSID;
-char pass[] = WIFI_PASSWD;
+char ssid[MAX_WIFI_LENGTH];
+char pass[MAX_WIFI_LENGTH];
 WiFiClient WifiClient;
 
 // Blink configuration
-Blink blink(LED_BUILTIN, 1000);     // Blink every second   
+#define BLINK_UNCONFIGURED 2000
+#define BLINK_CONFIGURED 1000
+Blink blink(LED_BUILTIN); 
 
 // MQTT configuration
 #define TOPIC_LENGTH 64
@@ -47,11 +50,19 @@ unsigned long last_pulse = millis();
 int H2O_prev_state = 0;
 float H2O_value = H20_RESTORE;
 
+// Serial configuration
+#define SERIAL_SPEED 9600
+#define SERIAL_BUF_LENGTH 32
+char serial_buf[SERIAL_BUF_LENGTH];
+int sp;
+
 // Numpy
 Numpy np;
 
 // Connect to WiFi network
-void setup_wifi() {
+bool setup_WiFi() {
+  int i = 0;
+  
   // Report SSID
   Serial.print(F("Connecting to: "));
   Serial.print(ssid);
@@ -59,13 +70,22 @@ void setup_wifi() {
 
   // Connect to WiFi network
   WiFi.mode(WIFI_STA);
-  WiFi.config(ip, gateway, subnet, dns);
+  //WiFi.config(ip, gateway, subnet, dns);
   WiFi.begin(ssid, pass);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(F("."));
+  
+  while ((WiFi.status() != WL_CONNECTED) and (i < MAX_WIFI_WAITS)) {
+    delay(WIFI_WAIT);
+    //Serial.print(F("."));
+    i++;
   }
+
+  if (WiFi.status() != WL_CONNECTED)
+    return false;
+
+  // Extract node UUID
+  byte mac[6];
+  WiFi.macAddress(mac);
+  array_to_string(mac, 6, node_uuid);
 
   // Report the IP address
   Serial.println(F(""));
@@ -73,43 +93,214 @@ void setup_wifi() {
   Serial.println(WiFi.localIP());
   Serial.print(F("MAC: "));
   Serial.println(WiFi.macAddress());
+
+  return true;
 }
 
 void setup() {
   // Setup serial connection
-  Serial.begin(9600);
+  Serial.begin(SERIAL_SPEED);
 
-  // Setup WiFi
-  setup_wifi();
+  // Initialise EEPROM
+  EEPROM.begin(EEPROM_SIZE);
 
-  // Setup MQTT broker connection
-  mqtt_client.setServer(broker, port);
+  if (check_EEPROM_init())
+  { // If node is configured...
+    // Update blink interval
+    blink.set_interval(BLINK_CONFIGURED);
+    
+    // Setup WiFi
+    setup_WiFi();
 
-  // Extract node UUID
-  byte mac[6];
-  WiFi.macAddress(mac);
-  array_to_string(mac, 6, node_uuid);
-
-  // Setup I/O
-  pinMode(S0_pin, INPUT_PULLUP);
-  pinMode(H2O_pin, INPUT);
+    // Setup MQTT broker connection
+    mqtt_client.setServer(broker, port);
+  } else {
+    // Node not configured for WiFi
+    // Update blink interval
+    blink.set_interval(BLINK_UNCONFIGURED);
+    
+    // Setup I/O
+    pinMode(S0_pin, INPUT_PULLUP);
+    pinMode(H2O_pin, INPUT);
   
-  // Set up additional GND
-  pinMode(D2, OUTPUT);
-  digitalWrite(D2, LOW);
+    // Set up additional GND
+    pinMode(D2, OUTPUT);
+    digitalWrite(D2, LOW);
+
+    // Initialise serial interface for read
+    reset_serial_buffer();
+  }
 }
 
 void loop() {
   // Blink handling
   blink.update();
 
-  // Local input handling
-  H2O_read();
-  S0_read(); 
+  if (check_EEPROM_init())
+  { // If node is configured...
+    // Local input handling
+    H2O_read();
+    S0_read(); 
 
-  // MQTT
-  mqtt_client.loop();
+    // MQTT
+    mqtt_client.loop();
+  } else {
+    // Wait for configuration from Python
+    listen_serial();
+  }
+}
 
+void reset_serial_buffer(void)
+{
+  sp = 0;
+  for(int i=0; i<SERIAL_BUF_LENGTH; i++)
+  { // Initialize serial buffer
+    serial_buf[i] = '\0';
+  }
+}
+
+void listen_serial(void)
+{
+  char c;
+  while(Serial.available())
+  {
+    c = Serial.read();
+    if (c != '\n')
+    {
+      // Add to buffer
+      serial_buf[sp++] = c; 
+    } else {
+      // EOL character received, process command
+      serial_buf[sp] = '\0';
+      process_serial();
+      reset_serial_buffer();
+    } 
+  }
+}
+
+void process_serial()
+{
+  if (strcmp(serial_buf, (char*) F("list_ssid")))
+    list_SSID();
+  else if (strcmp(serial_buf, (char*) F("set_ssid")))
+    set_WiFi(ssid, 1);
+  else if (strcmp(serial_buf, (char*) F("set_pass")))
+    set_WiFi(pass, 1 + MAX_WIFI_LENGTH);
+  else if (strcmp(serial_buf, (char*) F("init_wifi")))
+    init_WiFi();
+  else if (strcmp(serial_buf, (char*) F("reset")))
+    EEPROM_reset();
+  else
+    Serial.println(F("E0: Unknown command"));
+}
+
+void init_WiFi()
+{
+  if (setup_WiFi()) 
+  {
+    // Toggle valid WiFi data bit in EEPROM
+    EEPROM.write(0, 'W');
+    EEPROM.commit();  
+      
+    // Connect MQTT client
+    mqtt_client.setServer(broker, port);
+    // Report success to Python
+    Serial.println(F("OK"));  
+  } else {
+    // Report error to Python
+    Serial.println(F("E1: Unable to establish WiFi connection"));
+  }
+}
+
+void list_SSID() 
+{
+  int numberOfNetworks = WiFi.scanNetworks();
+  Serial.print(F("{"));
+  for(int i =0; i<numberOfNetworks; i++)
+  {
+    Serial.print(F("\""));
+    Serial.print(WiFi.SSID(i));
+    Serial.print(F("\":\""));
+    Serial.print(WiFi.RSSI(i));
+    Serial.print(F("\""));
+    if (i < numberOfNetworks - 1) 
+      Serial.print(F(","));
+  }
+  Serial.println(F("}"));
+}
+
+void set_WiFi(char* data, int loc)
+{
+  char c;
+  while (!Serial.available()) 
+  { // Wait for SSID data to arrive
+  }
+
+  reset_serial_buffer();
+  while (Serial.available())
+  {
+    c = Serial.read();
+    if (c != '\n')
+    {
+      // Add to buffer
+      serial_buf[sp++] = c; 
+    } else {
+      // EOL character received, process command
+      write_EEPROM(loc, sp, serial_buf);
+      reset_serial_buffer();
+      // Report success to Python
+      Serial.println(F("OK"));
+    } 
+  } 
+}
+
+void EEPROM_reset(void)
+{
+  for (int i = 0 ; i < EEPROM_SIZE ; i++) {
+    EEPROM.write(i, 0);
+  }
+  EEPROM.commit();
+}
+
+bool check_EEPROM_init(void)
+{
+  char data[MAX_WIFI_LENGTH];
+  char c = EEPROM.read(1);
+  if (c == 'W') 
+  {
+    // Read data from EEPROM
+    read_EEPROM(1, data);
+    strcpy(data, ssid);
+    read_EEPROM(1 + MAX_WIFI_LENGTH, data);
+    strcpy(data, pass);
+    return true;
+  }
+  else
+    return false;
+}
+
+void write_EEPROM(int loc, int len, char* data)
+{
+  // Valid data key on first bit
+  for (int i=0; i<len; i++)
+  {
+    EEPROM.write(1+loc+i, data[i]);
+  }
+  EEPROM.write(1+loc+len, '\0');
+  EEPROM.commit();
+}
+
+void read_EEPROM(int loc, char* data)
+{
+  int i = 0;
+  char c;
+  // Valid data in EEPROM, read and return
+  while(c != '\0')
+  {
+    c = EEPROM.read(1+loc+i);
+    data[i++] = c;
+  }
+  data[i] = '\0'; 
 }
 
 void array_to_string(byte array[], unsigned int len, char buffer[])
