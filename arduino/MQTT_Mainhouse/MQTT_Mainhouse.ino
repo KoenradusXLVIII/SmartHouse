@@ -18,7 +18,7 @@ char pass[MAX_WIFI_LENGTH];
 WiFiClient WifiClient;
 
 // Blink configuration
-#define BLINK_UNCONFIGURED 2000
+#define BLINK_UNCONFIGURED 5000
 #define BLINK_CONFIGURED 1000
 Blink blink(LED_BUILTIN); 
 
@@ -86,11 +86,6 @@ bool setup_WiFi() {
   if (WiFi.status() != WL_CONNECTED)
     return false;
 
-  // Extract node UUID
-  byte mac[6];
-  WiFi.macAddress(mac);
-  array_to_string(mac, 6, node_uuid);
-
   // Report the IP address
   Serial.println(F(""));
   Serial.print(F("IP Address: "));
@@ -104,11 +99,18 @@ bool setup_WiFi() {
 void setup() {  
   // Setup serial connection
   Serial.begin(SERIAL_SPEED);
-  Serial.println();
-  Serial.println();
+  Serial.println(F("."));
 
   // Initialise EEPROM
   EEPROM.begin(EEPROM_SIZE);
+
+  // Initialise WiFi
+  WiFi.setAutoConnect(0);
+
+  // Extract node UUID
+  byte mac[6];
+  WiFi.macAddress(mac);
+  array_to_string(mac, 6, node_uuid);
 
   if (EEPROM_RESET)
     EEPROM_reset();
@@ -149,17 +151,17 @@ void loop() {
   // Blink handling
   blink.update();
 
+  // Listen on serial port
+  listen_serial();
+    
   if (EEPROM_initialized)
   { // If node is configured...
     // Local input handling
-    H2O_read();
-    S0_read(); 
+    //H2O_read();
+    //S0_read(); 
 
     // MQTT
     mqtt_client.loop();
-  } else {
-    // Wait for configuration from Python
-    listen_serial();
   }
 }
 
@@ -203,6 +205,14 @@ void process_serial()
     init_WiFi();
   else if (strcmp(serial_buf, (char*) F("reset")) == 0)
     EEPROM_reset();
+  else if (strcmp(serial_buf, (char*) F("get_uuid")) == 0)
+    Serial.println(node_uuid);
+  else if (strcmp(serial_buf, (char*) F("get_ssid")) == 0)
+    Serial.println(ssid);
+  else if (strcmp(serial_buf, (char*) F("get_wifi_status")) == 0)
+    Serial.println(WiFi.status());
+  else if (strcmp(serial_buf, (char*) F("get_ip")) == 0)
+    Serial.println(WiFi.localIP());
   else
     Serial.println(F("E0: Unknown command"));
 }
@@ -269,7 +279,7 @@ void set_WiFi(char* data, int loc)
   while (Serial.available())
   {
     c = Serial.read();
-    Serial.print(c);
+    // Serial.print(c);
     if (c != '\n')
     {
       // Add to buffer
@@ -278,7 +288,6 @@ void set_WiFi(char* data, int loc)
       // EOL character received, process command
       write_EEPROM(loc, sp, serial_buf);
       // Report success to Python
-      Serial.print(F("OK: "));
       Serial.println(serial_buf);
       // Reset serial buffer
       reset_serial_buffer();
@@ -294,6 +303,16 @@ void EEPROM_reset(void)
     EEPROM.write(i, 0);
   }
   EEPROM.commit();
+  EEPROM_initialized = false;
+
+  // Disconnect WiFi
+  WiFi.disconnect();
+
+  // Set blink to unconfigured
+  blink.set_interval(BLINK_UNCONFIGURED);
+
+  // Report to Python
+  Serial.println(F("OK"));
 }
 
 bool check_EEPROM_init(void)
@@ -317,11 +336,7 @@ void write_EEPROM(int loc, int len, char* data)
 {
   // Valid data key on first bit
   for (int i=0; i<len; i++)
-  {
     EEPROM.write(loc+i, data[i]);
-    Serial.println(loc+i);
-  }
-  Serial.println(loc+len);
   EEPROM.write(loc+len, '\0');
   EEPROM.commit();
 }
