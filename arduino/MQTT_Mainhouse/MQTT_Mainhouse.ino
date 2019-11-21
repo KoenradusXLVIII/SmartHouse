@@ -51,13 +51,17 @@ int H2O_prev_state = 0;
 float H2O_value = H20_RESTORE;
 
 // Serial configuration
-#define SERIAL_SPEED 9600
+#define SERIAL_SPEED 115200
 #define SERIAL_BUF_LENGTH 32
 char serial_buf[SERIAL_BUF_LENGTH];
 int sp;
 
 // Numpy
 Numpy np;
+
+// EEPROM
+#define EEPROM_RESET false
+bool EEPROM_initialized = false;
 
 // Connect to WiFi network
 bool setup_WiFi() {
@@ -75,7 +79,7 @@ bool setup_WiFi() {
   
   while ((WiFi.status() != WL_CONNECTED) and (i < MAX_WIFI_WAITS)) {
     delay(WIFI_WAIT);
-    //Serial.print(F("."));
+    Serial.print(F("."));
     i++;
   }
 
@@ -97,15 +101,22 @@ bool setup_WiFi() {
   return true;
 }
 
-void setup() {
+void setup() {  
   // Setup serial connection
   Serial.begin(SERIAL_SPEED);
+  Serial.println();
+  Serial.println();
 
   // Initialise EEPROM
   EEPROM.begin(EEPROM_SIZE);
 
-  if (check_EEPROM_init())
+  if (EEPROM_RESET)
+    EEPROM_reset();
+
+  EEPROM_initialized = check_EEPROM_init();
+  if (EEPROM_initialized)
   { // If node is configured...
+    Serial.println(F("Node configured, initializing..."));
     // Update blink interval
     blink.set_interval(BLINK_CONFIGURED);
     
@@ -116,6 +127,8 @@ void setup() {
     mqtt_client.setServer(broker, port);
   } else {
     // Node not configured for WiFi
+    Serial.println(F("Node not configured"));
+    
     // Update blink interval
     blink.set_interval(BLINK_UNCONFIGURED);
     
@@ -136,7 +149,7 @@ void loop() {
   // Blink handling
   blink.update();
 
-  if (check_EEPROM_init())
+  if (EEPROM_initialized)
   { // If node is configured...
     // Local input handling
     H2O_read();
@@ -180,15 +193,15 @@ void listen_serial(void)
 
 void process_serial()
 {
-  if (strcmp(serial_buf, (char*) F("list_ssid")))
+  if (strcmp(serial_buf, (char*) F("list_ssid")) == 0)
     list_SSID();
-  else if (strcmp(serial_buf, (char*) F("set_ssid")))
+  else if (strcmp(serial_buf, (char*) F("set_ssid")) == 0)
     set_WiFi(ssid, 1);
-  else if (strcmp(serial_buf, (char*) F("set_pass")))
+  else if (strcmp(serial_buf, (char*) F("set_pass")) == 0)
     set_WiFi(pass, 1 + MAX_WIFI_LENGTH);
-  else if (strcmp(serial_buf, (char*) F("init_wifi")))
+  else if (strcmp(serial_buf, (char*) F("init_wifi")) == 0)
     init_WiFi();
-  else if (strcmp(serial_buf, (char*) F("reset")))
+  else if (strcmp(serial_buf, (char*) F("reset")) == 0)
     EEPROM_reset();
   else
     Serial.println(F("E0: Unknown command"));
@@ -196,6 +209,17 @@ void process_serial()
 
 void init_WiFi()
 {
+  // Read SSID/pass from EEPROM
+  char data[MAX_WIFI_LENGTH];
+  read_EEPROM(1, data);
+  strcpy(ssid, data);
+  read_EEPROM(1 + MAX_WIFI_LENGTH, data);
+  strcpy(pass, data);
+
+  // Actively disconnect from any connected WiFi
+  WiFi.disconnect();
+  delay(100);
+  
   if (setup_WiFi()) 
   {
     // Toggle valid WiFi data bit in EEPROM
@@ -204,6 +228,10 @@ void init_WiFi()
       
     // Connect MQTT client
     mqtt_client.setServer(broker, port);
+    
+    // Update blink interval
+    blink.set_interval(BLINK_CONFIGURED);
+    
     // Report success to Python
     Serial.println(F("OK"));  
   } else {
@@ -231,6 +259,7 @@ void list_SSID()
 
 void set_WiFi(char* data, int loc)
 {
+  Serial.println(F("OK"));
   char c;
   while (!Serial.available()) 
   { // Wait for SSID data to arrive
@@ -240,6 +269,7 @@ void set_WiFi(char* data, int loc)
   while (Serial.available())
   {
     c = Serial.read();
+    Serial.print(c);
     if (c != '\n')
     {
       // Add to buffer
@@ -247,16 +277,20 @@ void set_WiFi(char* data, int loc)
     } else {
       // EOL character received, process command
       write_EEPROM(loc, sp, serial_buf);
-      reset_serial_buffer();
       // Report success to Python
-      Serial.println(F("OK"));
+      Serial.print(F("OK: "));
+      Serial.println(serial_buf);
+      // Reset serial buffer
+      reset_serial_buffer();
     } 
+    // Wait for next character
+    delay(1);
   } 
 }
 
 void EEPROM_reset(void)
 {
-  for (int i = 0 ; i < EEPROM_SIZE ; i++) {
+  for (int i = 0 ; i < EEPROM.length() ; i++) {
     EEPROM.write(i, 0);
   }
   EEPROM.commit();
@@ -265,14 +299,14 @@ void EEPROM_reset(void)
 bool check_EEPROM_init(void)
 {
   char data[MAX_WIFI_LENGTH];
-  char c = EEPROM.read(1);
+  char c = EEPROM.read(0);
   if (c == 'W') 
   {
     // Read data from EEPROM
     read_EEPROM(1, data);
-    strcpy(data, ssid);
+    strcpy(ssid, data);
     read_EEPROM(1 + MAX_WIFI_LENGTH, data);
-    strcpy(data, pass);
+    strcpy(pass, data);
     return true;
   }
   else
@@ -284,9 +318,11 @@ void write_EEPROM(int loc, int len, char* data)
   // Valid data key on first bit
   for (int i=0; i<len; i++)
   {
-    EEPROM.write(1+loc+i, data[i]);
+    EEPROM.write(loc+i, data[i]);
+    Serial.println(loc+i);
   }
-  EEPROM.write(1+loc+len, '\0');
+  Serial.println(loc+len);
+  EEPROM.write(loc+len, '\0');
   EEPROM.commit();
 }
 
@@ -297,7 +333,7 @@ void read_EEPROM(int loc, char* data)
   // Valid data in EEPROM, read and return
   while(c != '\0')
   {
-    c = EEPROM.read(1+loc+i);
+    c = EEPROM.read(loc+i);
     data[i++] = c;
   }
   data[i] = '\0'; 
