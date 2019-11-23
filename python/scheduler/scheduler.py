@@ -41,7 +41,7 @@ def reset_rain_meter():
 def lights_out():
     if hue_client.get_scene(cfg['hue']['scenes']['not home']):
         # Turn all lights off within a set random time
-        delay = random.randint(1,cfg['hue']['random'])
+        delay = random.randint(1, cfg['hue']['random'])
         nebula_client.info('Switching lights off in %d seconds!' % delay)
         time.sleep(delay)
         hue_client.set_all_off()

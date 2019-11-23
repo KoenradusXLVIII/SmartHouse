@@ -46,7 +46,7 @@ class Client:
         return rv
 
     def _trail(self, msg, level):
-        url = self.url + 'api/trail.php'
+        url = self.url + '/api/trail.php'
         data = self.auth.copy()
         data['level'] = _levelToName[level]
         data['message'] = json.dumps(msg).strip('"')
