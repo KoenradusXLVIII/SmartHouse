@@ -26,3 +26,5 @@ config.h
 python/random/
 *.egg-info/
 *.key
+python/MQTT/scripts/live_tracker_sensornode.py
+python/MQTT/scripts/post_sensornode.py
