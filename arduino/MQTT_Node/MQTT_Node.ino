@@ -50,6 +50,10 @@ unsigned long longPrevious = millis();
 // SPECIFIC CONFIGURATION STARTS //
 // ============================= //
 
+#define IO_COUNT 0
+int IO_ID[IO_COUNT] = {};
+int IO_pin[IO_COUNT] = {};
+
 // ============================= //
 //  SPECIFIC CONFIGURATION ENDS  //
 // ============================= //
@@ -92,9 +96,6 @@ void setup() {
   Serial.begin(SERIAL_SPEED);
   Serial.println(F("."));
 
-  // Initialise WiFi
-  WiFi.setAutoConnect(0);
-
   // Extract node UUID
   byte mac[6];
   WiFi.macAddress(mac);
@@ -114,6 +115,13 @@ void setup() {
 
     // Setup MQTT broker connection
     mqtt_client.setServer(broker, port);
+    mqtt_client.setCallback(callback);
+
+    // Subscribe to my MQTT topic
+    strcpy(charTopic, "nodes/");
+    strcat(charTopic, node_uuid);
+    strcat(charTopic, "/io/#");
+    mqtt_client.subscribe(charTopic);
     
   } else {   
     // Node not configured for WiFi
@@ -384,6 +392,43 @@ void array_to_string(byte array[], unsigned int len, char buffer[])
 // MQTT functions
 //
 
+// MQTT callback triggered on message received
+void callback(char* topic, byte* payload, unsigned int length) {
+  int intValue;
+  char charPayload[length];
+
+  for (int i = 0; i < length; i++)
+    charPayload[i] = (char)payload[i];
+
+  sscanf(charPayload, "%d", &intValue);
+  Serial.print("Received message on topic: ");
+  Serial.print(topic);
+  Serial.print(" => ");
+  Serial.println(intValue);
+  process_cmd(sensor_id(topic), intValue);
+}
+
+// Control IO based on MQTT command
+void process_cmd(int intSensorID, int intValue) {
+  for (int i = 0; i < IO_COUNT; i++) {
+    if (IO_ID[i] == intSensorID)
+      digitalWrite(IO_pin[i], intValue);
+  }
+}
+
+// Extract sensor ID from topic
+int sensor_id(char* topic) {
+  int intSensorID;
+
+  for (int i = 0; i < strlen(topic); i++ )
+    if (topic[i] == '/')
+      topic[i] = ' ';
+
+  sscanf(topic, "%*s %*s %*s %d", &intSensorID);
+
+  return intSensorID;
+}
+
 // Reconnect to client
 void mqtt_reconnect() {
   // Loop until we're reconnected
@@ -392,6 +437,8 @@ void mqtt_reconnect() {
     // Attempt to connect
     if (mqtt_client.connect(node_uuid, MQTT_USER, MQTT_API_KEY)) {
       Serial.println(F("connected"));
+      // Resubscribe to topic after disconnect
+      mqtt_client.subscribe(charTopic);
     } else {
       Serial.println(F(" try again in 5 seconds"));
       // Wait 5 seconds before retrying
