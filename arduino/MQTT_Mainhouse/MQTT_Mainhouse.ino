@@ -60,8 +60,15 @@ int sp;
 Numpy np;
 
 // EEPROM
-#define EEPROM_RESET false
 bool EEPROM_initialized = false;
+
+// ============================= //
+// SPECIFIC CONFIGURATION STARTS //
+// ============================= //
+
+// ============================= //
+//  SPECIFIC CONFIGURATION ENDS  //
+// ============================= //
 
 // Connect to WiFi network
 bool setup_WiFi() {
@@ -101,9 +108,6 @@ void setup() {
   Serial.begin(SERIAL_SPEED);
   Serial.println(F("."));
 
-  // Initialise EEPROM
-  EEPROM.begin(EEPROM_SIZE);
-
   // Initialise WiFi
   WiFi.setAutoConnect(0);
 
@@ -112,9 +116,8 @@ void setup() {
   WiFi.macAddress(mac);
   array_to_string(mac, 6, node_uuid);
 
-  if (EEPROM_RESET)
-    EEPROM_reset();
-
+  // Initialise EEPROM
+  EEPROM.begin(EEPROM_SIZE); 
   EEPROM_initialized = check_EEPROM_init();
   if (EEPROM_initialized)
   { // If node is configured...
@@ -127,12 +130,20 @@ void setup() {
 
     // Setup MQTT broker connection
     mqtt_client.setServer(broker, port);
-  } else {
+    
+  } else {   
     // Node not configured for WiFi
     Serial.println(F("Node not configured"));
     
     // Update blink interval
     blink.set_interval(BLINK_UNCONFIGURED);
+
+    // Initialise serial interface for read
+    reset_serial_buffer();
+
+    // ===================== //
+    // SPECIFIC SETUP STARTS //
+    // ===================== //
     
     // Setup I/O
     pinMode(S0_pin, INPUT_PULLUP);
@@ -142,8 +153,9 @@ void setup() {
     pinMode(D2, OUTPUT);
     digitalWrite(D2, LOW);
 
-    // Initialise serial interface for read
-    reset_serial_buffer();
+    // ===================== //
+    //  SPECIFIC SETUP ENDS  //
+    // ===================== //
   }
 }
 
@@ -156,24 +168,98 @@ void loop() {
     
   if (EEPROM_initialized)
   { // If node is configured...
-    // Local input handling
-    //H2O_read();
-    //S0_read(); 
-
     // MQTT
     mqtt_client.loop();
+
+    // ============================== //
+    // SPECIFIC FUNCTION CALLS STARTS //
+    // ============================== //
+    
+    H2O_read();
+    S0_read(); 
+
+    // ============================== //
+    //  SPECIFIC FUNCTION CALLS ENDS  //
+    // ============================== //
   }
 }
 
-void reset_serial_buffer(void)
-{
-  sp = 0;
-  for(int i=0; i<SERIAL_BUF_LENGTH; i++)
-  { // Initialize serial buffer
-    serial_buf[i] = '\0';
+// ========================= //
+// SPECIFIC FUNCTIONS STARTS //
+// ========================= //
+    
+// Read H2O sensor
+// Pulls input to GND on pulse
+void H2O_read(void) {
+  // Read I/O
+  int H2O_cur_state = digitalRead(H2O_pin);
+  
+  // Upward flink
+  if(H2O_prev_state == 0)
+  {
+    if (H2O_cur_state == 1)
+    { // Start of pulse detected
+      H2O_value += 1;
+      mqtt_publish(H2O_ID, H2O_value);  
+    }
   }
+
+  H2O_prev_state = H2O_cur_state;
 }
 
+void S0_read(void) {
+  // Initialize variables
+  char charValue[MAX_LENGTH_SIGNED_LONG];
+  
+  // Store current P_PV
+  float P_PV_prev_value = np.filt_mean(P_PV, BUF_LENGTH, 1); ;
+  
+  // Read input pin
+  int S0_cur_state = digitalRead(S0_pin);
+
+  // Compute time difference
+  unsigned long delta_t_ms = millis()-last_pulse; // ms
+
+  // Downward flank
+  if(S0_prev_state == 1)
+  {
+    if (S0_cur_state == 0)
+    { // Start of pulse detected
+      E_PV_value += 1;
+      mqtt_publish(E_PV_ID, E_PV_value);  
+      if (delta_t_ms > MAX_PV_DT) // Avoid invalid power calculation
+      {
+          np.add_to_buffer(MS_PER_HOUR / delta_t_ms, P_PV, BUF_LENGTH);
+          P_PV_value = np.filt_mean(P_PV, BUF_LENGTH, 1);
+      }
+      last_pulse = millis();
+    }
+  } 
+
+  // If no pulse within time-out window assume
+  // power below minimum power, write 0 to buffer
+  if (delta_t_ms > MIN_PV_DT) {
+    np.add_to_buffer(0, P_PV, BUF_LENGTH);
+    P_PV_value = np.filt_mean(P_PV, BUF_LENGTH, 1);
+  }
+
+  // If P_PV changed, publish it to MQTT broker
+  if (P_PV_value != P_PV_prev_value) {
+    mqtt_publish(P_PV_ID, P_PV_value);
+  }
+  
+  // Store current S0 state for future reference
+  S0_prev_state = S0_cur_state;
+}    
+
+// ========================= //
+//  SPECIFIC FUNCTIONS ENDS  //
+// ========================= //
+
+
+//
+// Python Serial communcation functions
+//
 void listen_serial(void)
 {
   char c;
@@ -215,6 +301,15 @@ void process_serial()
     Serial.println(WiFi.localIP());
   else
     Serial.println(F("E0: Unknown command"));
+}
+
+void reset_serial_buffer(void)
+{
+  sp = 0;
+  for(int i=0; i<SERIAL_BUF_LENGTH; i++)
+  { // Initialize serial buffer
+    serial_buf[i] = '\0';
+  }
 }
 
 void init_WiFi()
@@ -315,6 +410,10 @@ void EEPROM_reset(void)
   Serial.println(F("OK"));
 }
 
+//
+// EEPROM functions
+// 
+
 bool check_EEPROM_init(void)
 {
   char data[MAX_WIFI_LENGTH];
@@ -354,6 +453,10 @@ void read_EEPROM(int loc, char* data)
   data[i] = '\0'; 
 }
 
+//
+// WiFi functions
+//
+
 void array_to_string(byte array[], unsigned int len, char buffer[])
 {
     for (unsigned int i = 0; i < len; i++)
@@ -365,6 +468,10 @@ void array_to_string(byte array[], unsigned int len, char buffer[])
     }
     buffer[len*2] = '\0';
 }
+
+//
+// MQTT functions
+//
 
 // Reconnect to client
 void mqtt_reconnect() {
@@ -410,7 +517,10 @@ void mqtt_publish(int id, int value) {
   // Publish int
   // MQTT client connection
   if (!mqtt_client.connected())  // Reconnect if connection is lost
+  {
+    Serial.println("connecting...");
     mqtt_reconnect();
+  }
     
   // Publish value
   char charTopic[TOPIC_LENGTH];
@@ -428,68 +538,4 @@ void mqtt_publish(int id, int value) {
   Serial.print(F(" => "));
   Serial.println(charValue);
   mqtt_client.publish(charTopic, charValue, true);  
-}
-
-// Read H2O sensor
-// Pulls input to GND on pulse
-void H2O_read(void) {
-  // Read I/O
-  int H2O_cur_state = digitalRead(H2O_pin);
-  
-  // Upward flink
-  if(H2O_prev_state == 0)
-  {
-    if (H2O_cur_state == 1)
-    { // Start of pulse detected
-      H2O_value += 1;
-      mqtt_publish(H2O_ID, H2O_value);  
-    }
-  }
-
-  H2O_prev_state = H2O_cur_state;
-}
-
-void S0_read(void) {
-  // Initialize variables
-  char charValue[MAX_LENGTH_SIGNED_LONG];
-  
-  // Store current P_PV
-  float P_PV_prev_value = np.filt_mean(P_PV, BUF_LENGTH, 1); ;
-  
-  // Read input pin
-  int S0_cur_state = digitalRead(S0_pin);
-
-  // Compute time difference
-  unsigned long delta_t_ms = millis()-last_pulse; // ms
-
-  // Downward flank
-  if(S0_prev_state == 1)
-  {
-    if (S0_cur_state == 0)
-    { // Start of pulse detected
-      E_PV_value += 1;
-      mqtt_publish(E_PV_ID, E_PV_value);  
-      if (delta_t_ms > MAX_PV_DT) // Avoid invalid power calculation
-      {
-          np.add_to_buffer(MS_PER_HOUR / delta_t_ms, P_PV, BUF_LENGTH);
-          P_PV_value = np.filt_mean(P_PV, BUF_LENGTH, 1);
-      }
-      last_pulse = millis();
-    }
-  } 
-
-  // If no pulse within time-out window assume
-  // power below minimum power, write 0 to buffer
-  if (delta_t_ms > MIN_PV_DT) {
-    np.add_to_buffer(0, P_PV, BUF_LENGTH);
-    P_PV_value = np.filt_mean(P_PV, BUF_LENGTH, 1);
-  }
-
-  // If P_PV changed, publish it to MQTT broker
-  if (P_PV_value != P_PV_prev_value) {
-    mqtt_publish(P_PV_ID, P_PV_value);
-  }
-  
-  // Store current S0 state for future reference
-  S0_prev_state = S0_cur_state;
 }
