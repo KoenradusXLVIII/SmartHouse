@@ -7,12 +7,12 @@ import paho.mqtt.client as mqtt
 import nebula
 
 # Load configuration YAML
-path = os.path.dirname(os.path.realpath(__file__))
-fp = open(path + '/config.yaml', 'r')
-cfg = yaml.load(fp)
+#path = os.path.dirname(os.path.realpath(__file__))
+#fp = open(path + '/config.yaml', 'r')
+#cfg = yaml.load(fp)
 
 # Set up Nebula API client
-nebula_client = nebula.Client(**cfg['nebula'])
+#nebula_client = nebula.Client(**cfg['nebula'])
 
 # The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
