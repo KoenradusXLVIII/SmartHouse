@@ -16,6 +16,8 @@
 char ssid[MAX_WIFI_LENGTH];
 char pass[MAX_WIFI_LENGTH];
 WiFiClient WifiClient;
+int prev_rssi = 0;
+int rssi_buf[BUF_LENGTH];
 
 // Blink configuration
 #define BLINK_UNCONFIGURED 5000
@@ -27,6 +29,25 @@ Blink blink(LED_BUILTIN);
 PubSubClient mqtt_client(WifiClient);
 char node_uuid[12];
 char charTopic[20];
+
+// Serial configuration
+#define SERIAL_SPEED 115200
+#define SERIAL_BUF_LENGTH 32
+char serial_buf[SERIAL_BUF_LENGTH];
+int sp;
+
+// Numpy
+Numpy np;
+
+// EEPROM
+bool EEPROM_initialized = false;
+
+// Global timing
+unsigned long longPrevious = millis();
+
+// ============================= //
+// SPECIFIC CONFIGURATION STARTS //
+// ============================= //
 
 // S0 configuration
 #define E_PV_RESTORE 1458230                 // Wh
@@ -49,22 +70,6 @@ unsigned long last_pulse = millis();
 #define H2O_ID 7
 int H2O_prev_state = 0;
 float H2O_value = H20_RESTORE;
-
-// Serial configuration
-#define SERIAL_SPEED 115200
-#define SERIAL_BUF_LENGTH 32
-char serial_buf[SERIAL_BUF_LENGTH];
-int sp;
-
-// Numpy
-Numpy np;
-
-// EEPROM
-bool EEPROM_initialized = false;
-
-// ============================= //
-// SPECIFIC CONFIGURATION STARTS //
-// ============================= //
 
 // ============================= //
 //  SPECIFIC CONFIGURATION ENDS  //
@@ -489,53 +494,76 @@ void mqtt_reconnect() {
   }
 }
 
+void mqtt_publish(int id, float value, int interval) {
+  unsigned long longNow = millis();
+  
+  if (longNow - longPrevious >= (interval*60000)) {
+    // Reset ticker
+    longPrevious = longNow;
+    
+    // MQTT client connection
+    if (!mqtt_client.connected())  // Reconnect if connection is lost
+      mqtt_reconnect();
+  
+    // Publish value
+    char charTopic[TOPIC_LENGTH];
+    char charID[MAX_LENGTH_SIGNED_INT];
+    char charValue[6];
+    strcpy(charTopic, (const char *) F("nodes/"));
+    strcat(charTopic, node_uuid);
+    strcat(charTopic, (const char *) F("/sensors/"));
+    itoa(id, charID, 10);
+    strcat(charTopic, charID);
+    dtostrf(value, 1, 2, charValue);
+  
+    Serial.print(F("MQTT upload on topic: "));
+    Serial.print(charTopic);
+    Serial.print(F(" => "));
+    Serial.println(charValue);
+    mqtt_client.publish(charTopic, charValue, true);
+  }
+}
+
 void mqtt_publish(int id, float value) {
-  // Publish float
-  // MQTT client connection
-  if (!mqtt_client.connected())  // Reconnect if connection is lost
-    mqtt_reconnect();
+  // Publish float without interval
+  mqtt_publish(id, value, 0);
+}
 
-  // Publish value
-  char charTopic[TOPIC_LENGTH];
-  char charID[MAX_LENGTH_SIGNED_INT];
-  char charValue[6];
-  strcpy(charTopic, (const char *) F("nodes/"));
-  strcat(charTopic, node_uuid);
-  strcat(charTopic, (const char *) F("/sensors/"));
-  itoa(id, charID, 10);
-  strcat(charTopic, charID);
-  dtostrf(value, 1, 2, charValue);
-
-  Serial.print(F("MQTT upload on topic: "));
-  Serial.print(charTopic);
-  Serial.print(F(" => "));
-  Serial.println(charValue);
-  mqtt_client.publish(charTopic, charValue, true);
+void mqtt_publish(int id, int value, int interval) {
+  // Publish int with interval
+  mqtt_publish(id, (float) value, interval);
 }
 
 void mqtt_publish(int id, int value) {
-  // Publish int
-  // MQTT client connection
-  if (!mqtt_client.connected())  // Reconnect if connection is lost
-  {
-    Serial.println("connecting...");
-    mqtt_reconnect();
-  }
-    
-  // Publish value
-  char charTopic[TOPIC_LENGTH];
-  char charID[MAX_LENGTH_SIGNED_INT];
-  char charValue[6];
-  strcpy(charTopic, (const char *) F("nodes/"));
-  strcat(charTopic, node_uuid);
-  strcat(charTopic, (const char *) F("/sensors/"));
-  itoa(id, charID, 10);
-  strcat(charTopic, charID);
-  dtostrf(value, 1, 2, charValue);
+  // Publish int without interval
+  mqtt_publish(id, (float) value, 0);
+}
 
-  Serial.print(F("MQTT upload on topic: "));
-  Serial.print(charTopic);
-  Serial.print(F(" => "));
-  Serial.println(charValue);
-  mqtt_client.publish(charTopic, charValue, true);  
+void mqtt_rssi(void) {
+    int rssi;
+    
+    np.add_to_buffer((int) WiFi.RSSI(), rssi_buf, BUF_LENGTH);
+    rssi = np.filt_mean(rssi_buf, BUF_LENGTH, 1);  
+  
+    if (rssi != prev_rssi) 
+    {
+      // MQTT client connection
+      if (!mqtt_client.connected())  // Reconnect if connection is lost
+        mqtt_reconnect();
+    
+      // Publish value
+      char charTopic[TOPIC_LENGTH];
+      char charID[MAX_LENGTH_SIGNED_INT];
+      char charValue[6];
+      strcpy(charTopic, (const char *) F("nodes/"));
+      strcat(charTopic, node_uuid);
+      strcat(charTopic, (const char *) F("/rssi"));
+      dtostrf(rssi, 1, 2, charValue);
+    
+      Serial.print(F("MQTT upload on topic: "));
+      Serial.print(charTopic);
+      Serial.print(F(" => "));
+      Serial.println(charValue);
+      mqtt_client.publish(charTopic, charValue, true);  
+    }
 }
