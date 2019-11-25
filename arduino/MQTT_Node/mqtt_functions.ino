@@ -4,23 +4,16 @@
 
 // MQTT configuration
 char node_uuid[UUID_LENGTH];
-char charTopicSub[TOPIC_LENGTH];
 int rssi_buf[BUF_LENGTH];
 
 // MQTT callback triggered on message received
 void callback(char* topic, byte* payload, unsigned int length) {
-  int intValue;
   char charPayload[length];
-  char topic_type[TOPIC_LENGTH];
+  char charTopicType[TOPIC_LENGTH];
 
+  // Convert payload to character array
   for (int i = 0; i < length; i++)
     charPayload[i] = (char)payload[i];
-
-  sscanf(charPayload, "%d", &intValue);
-  Serial.print("Received message on topic: ");
-  Serial.print(topic);
-  Serial.print(" => ");
-  Serial.println(intValue);
 
   // Parse incoming to handle /
   for (int i = 0; i < strlen(topic); i++ )
@@ -28,13 +21,19 @@ void callback(char* topic, byte* payload, unsigned int length) {
       topic[i] = ' ';
 
   // Extract topic type
-  sscanf(topic, "%*s %*s %s %*s", topic_type);
+  sscanf(topic, "%*s %*s %s %*s", charTopicType);
 
   // Handle different topic types
-  if (strcmp(topic_type, (char*) F("io")))
+  if (strcmp(charTopicType, (char*) F("io")) == 0)
   {
     int intSensorID;
+    int intValue;
     sscanf(topic, "%*s %*s %*s %d", intSensorID);  
+    sscanf(charPayload, "%d", intValue);
+    Serial.print(F("Received IO message for :"));
+    Serial.print(intSensorID);
+    Serial.print(F(" => "));
+    Serial.println(intValue);    
     for (int i = 0; i < IO_COUNT; i++) 
     {
       if (IO_ID[i] == intSensorID)
@@ -44,11 +43,13 @@ void callback(char* topic, byte* payload, unsigned int length) {
       }
     }
   }
-  else if (strcmp(topic_type, (char*) F("update")))
+  else if (strcmp(charTopicType, (char*) F("update")) == 0)
   {
-    char charBinID[6];
-    sscanf(topic, "%*s %*s %*s %s", charBinID); 
-    update_OTA(charBinID);
+    char charBinID[OTA_BIN_FILE_LENGTH+1];
+    sscanf(charPayload, "%s", charBinID);
+    charBinID[OTA_BIN_FILE_LENGTH] = '\0';
+    if (strcmp(charBinID, OTA_VERSION) != 0)
+      update_OTA(charBinID);
   }
 }
 
@@ -74,9 +75,18 @@ char* get_uuid()
 
 void mqtt_subscribe(void)
 {
+    char charTopicSub[TOPIC_LENGTH];
+
+    // Subscribe to my IO topic
     strcpy(charTopicSub, "nodes/");
     strcat(charTopicSub, node_uuid);
-    strcat(charTopicSub, "/io/");
+    strcat(charTopicSub, "/io/+");
+    mqtt_client.subscribe(charTopicSub);
+
+    // Subscribe to my update topic
+    strcpy(charTopicSub, "nodes/");
+    strcat(charTopicSub, node_uuid);
+    strcat(charTopicSub, "/update");
     mqtt_client.subscribe(charTopicSub);
 }
 
@@ -89,7 +99,7 @@ void mqtt_reconnect() {
     if (mqtt_client.connect(node_uuid, MQTT_USER, MQTT_API_KEY)) {
       Serial.println(F("connected"));
       // Resubscribe to topic after disconnect
-      mqtt_client.subscribe(charTopicSub);
+      mqtt_subscribe();
     } else {
       Serial.println(F(" try again in 5 seconds"));
       // Wait 5 seconds before retrying
@@ -134,31 +144,39 @@ void mqtt_publish(int sensor_id, float value, int io_id, char* topic, int interv
   }
 }
 
-void mqtt_publish(int sensor_id, float value, int io_id) {
-  // Publish float without interval
-  mqtt_publish(sensor_id, value, io_id, "", 0);
+void mqtt_publish(int io_id, float value, int interval) {
+  // Publish float with io_id and interval, without io_pin
+  mqtt_publish(io_id, value, 0, "", interval);
 }
 
-void mqtt_publish(int sensor_id, int value, int io_id, int interval) {
-  // Publish int with interval
-  mqtt_publish(sensor_id, (float) value, io_id, "", interval);
+void mqtt_publish(int io_id, float value) {
+  // Publish float with io_id, without id_pin and interval
+  mqtt_publish(io_id, value, 0, "", 0);
 }
 
-void mqtt_publish(int value, int io_id, char* topic, int interval) {
-  // Publish int with interval
-  mqtt_publish(0, (float) value, io_id, topic, interval);
+void mqtt_publish(int io_id, int value, int io_pin) {
+  // Publish int with io_id and io_pin, without interval
+  mqtt_publish(io_id, (float) value, io_pin, "", 0);
 }
 
-void mqtt_publish(int sensor_id, int value, int io_id) {
-  // Publish int without interval
-  mqtt_publish(sensor_id, (float) value, io_id, "", 0);
+void mqtt_publish(int io_id, int value, int io_pin, int interval) {
+  // Publish int with io_id, io_pin and interval
+  mqtt_publish(io_id, (float) value, io_pin, "", interval);
 }
 
-void mqtt_rssi() {
+void mqtt_publish(int value, int counter_id, char* topic, int interval) {
+  // Publish integer with counter_id to topic with interval
+  mqtt_publish(0, (float) value, counter_id, topic, interval);
+}
+
+void mqtt_rssi(bool timed) {
     int rssi;
     char* topic = "/rssi";
     
     np.add_to_buffer((int) WiFi.RSSI(), rssi_buf, BUF_LENGTH);
     rssi = np.filt_mean(rssi_buf, BUF_LENGTH, 1);  
-    mqtt_publish(rssi, IO_COUNT, topic, 1);   // Publish RSSI to last IO position
+    if (timed)
+      mqtt_publish(rssi, IO_COUNT, topic, 1);   // Publish RSSI to last IO position
+    else
+      mqtt_publish(rssi, IO_COUNT, topic, 0);   // Publish RSSI to last IO position
 }

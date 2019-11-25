@@ -50,7 +50,8 @@ unsigned long longPrevious[IO_COUNT+1];
 void setup() {  
   // Setup serial connection
   Serial.begin(SERIAL_SPEED);
-  Serial.println(F("."));
+  Serial.print("Node running firmware version: ");
+  Serial.println(OTA_VERSION); 
 
   // Initialise EEPROM
   EEPROM.begin(EEPROM_SIZE); 
@@ -71,7 +72,25 @@ void setup() {
     // Setup MQTT broker connection
     mqtt_client.setServer(broker, port);
     mqtt_client.setCallback(callback);
-    mqtt_subscribe();
+    mqtt_reconnect();
+
+    // Force upload on boot
+    Serial.print(F("Initializing buffers"));
+    for (int i = 0; i < BUF_LENGTH; i++)
+    {
+      Serial.print(F("."));
+      mqtt_rssi(true);
+    }
+    Serial.println();
+    mqtt_rssi(false);
+    
+    // ===================== //
+    // SPECIFIC SETUP STARTS //
+    // ===================== //
+
+    // ===================== //
+    //  SPECIFIC SETUP ENDS  //
+    // ===================== //
     
   } else {   
     // Node not configured for WiFi
@@ -90,14 +109,6 @@ void setup() {
       longPrevious[i] = millis();
     }
     longPrevious[IO_COUNT] = millis();
-
-    // ===================== //
-    // SPECIFIC SETUP STARTS //
-    // ===================== //
-
-    // ===================== //
-    //  SPECIFIC SETUP ENDS  //
-    // ===================== //
   }
 }
 
@@ -114,7 +125,7 @@ void loop() {
     mqtt_client.loop();
 
     // Report RSSI
-    mqtt_rssi();
+    mqtt_rssi(true);
 
     // ============================== //
     // SPECIFIC FUNCTION CALLS STARTS //
