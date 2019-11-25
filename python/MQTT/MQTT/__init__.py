@@ -28,20 +28,21 @@ class Client:
             self._retained_msgs.append(msg)
 
     def _decode_msg(self, msg, msgs, filter, type):
-        _, mac, sensor_id = msg.topic.split('/')
-        value = msg.payload.decode('UTF-8')
-        #print('Decoding message | sensor_id: %s, value: %s' % (sensor_id, value))
-        if len(filter):
-            if not sensor_id in filter:
-                return
+        if 'sensors' in msg.topic:
+            _, mac, _, sensor_id = msg.topic.split('/')
+            value = msg.payload.decode('UTF-8')
+            #print('Decoding message | sensor_id: %s, value: %s' % (sensor_id, value))
+            if len(filter):
+                if not sensor_id in filter:
+                    return
 
-        # Cast to correct type
-        if type == 'int':
-            msgs[sensor_id] = int(value)
-        elif type == 'float':
-            msgs[sensor_id] = float(value)
-        elif type == 'str':
-            msgs[sensor_id] = str(value)
+            # Cast to correct type
+            if type == 'int':
+                msgs[sensor_id] = int(value)
+            elif type == 'float':
+                msgs[sensor_id] = float(value)
+            elif type == 'str':
+                msgs[sensor_id] = str(value)
 
     def subscribe(self, topic):
         self._topics.append(topic)
@@ -79,7 +80,7 @@ class Client:
         self._mac = mac
 
     def publish(self, node, sensor_id, value):
-        topic = 'nodes/%s/%s' % (node, sensor_id)
+        topic = 'nodes/%s/sensors/%s' % (node, sensor_id)
         self._mqtt_client.connect(self._host, self._port)
         self._mqtt_client.publish(topic, value, retain=True)
         self._mqtt_client.disconnect()
