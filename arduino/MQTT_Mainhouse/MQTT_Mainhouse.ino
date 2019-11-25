@@ -40,7 +40,7 @@ bool EEPROM_initialized = false;
 
 #define IO_COUNT 3
 int IO_ID[IO_COUNT] = {6, 47, 7};
-int IO_pin[IO_COUNT] = {};
+int IO_pin[IO_COUNT] = {-1, -1, -1};
 unsigned long longPrevious[IO_COUNT+1];
 
 // S0 configuration
@@ -108,11 +108,14 @@ void setup() {
 
     // Set I/O and timers
     for (int i = 0; i < IO_COUNT; i++) {
-      Serial.print(F("Setting pin ["));
-      Serial.print(IO_pin[i]);
-      Serial.println(F("] to OUTPUT mode"));
-      pinMode(IO_pin[i], OUTPUT);
-      digitalWrite(IO_pin[i], LOW);
+      if (IO_pin[i] > -1)
+      {
+        Serial.print(F("Setting pin ["));
+        Serial.print(IO_pin[i]);
+        Serial.println(F("] to OUTPUT mode"));
+        pinMode(IO_pin[i], OUTPUT);
+        digitalWrite(IO_pin[i], LOW);
+      }
       longPrevious[i] = millis();
     }
     longPrevious[IO_COUNT] = millis();
