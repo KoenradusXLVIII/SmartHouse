@@ -83,6 +83,17 @@ void setup() {
     }
     Serial.println();
     mqtt_rssi(false);
+
+    // Set I/O and timers
+    for (int i = 0; i < IO_COUNT; i++) {
+      Serial.print(F("Setting pin ["));
+      Serial.print(IO_pin[i]);
+      Serial.println(F("] to OUTPUT mode"));
+      pinMode(IO_pin[i], OUTPUT);
+      digitalWrite(IO_pin[i], LOW);
+      longPrevious[i] = millis();
+    }
+    longPrevious[IO_COUNT] = millis();
     
     // ===================== //
     // SPECIFIC SETUP STARTS //
@@ -101,14 +112,6 @@ void setup() {
 
     // Initialise serial interface for read
     reset_serial_buffer();
-
-    // Set I/O and timers
-    for (int i = 0; i < IO_COUNT; i++) {
-      pinMode(IO_pin[i], OUTPUT);
-      digitalWrite(IO_pin[i], LOW);
-      longPrevious[i] = millis();
-    }
-    longPrevious[IO_COUNT] = millis();
   }
 }
 

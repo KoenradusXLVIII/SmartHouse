@@ -28,16 +28,17 @@ void callback(char* topic, byte* payload, unsigned int length) {
   {
     int intSensorID;
     int intValue;
-    sscanf(topic, "%*s %*s %*s %d", intSensorID);  
-    sscanf(charPayload, "%d", intValue);
-    Serial.print(F("Received IO message for :"));
-    Serial.print(intSensorID);
-    Serial.print(F(" => "));
-    Serial.println(intValue);    
+    sscanf(topic, "%*s %*s %*s %d", &intSensorID);  
+    sscanf(charPayload, "%d", &intValue);
     for (int i = 0; i < IO_COUNT; i++) 
     {
       if (IO_ID[i] == intSensorID)
       {
+        Serial.print(F("Writing IO value ["));
+        Serial.print(intValue);
+        Serial.print(F("] to pin ["));
+        Serial.print(IO_pin[i]);    
+        Serial.println(F("]"));
         digitalWrite(IO_pin[i], intValue);
         break;
       }
