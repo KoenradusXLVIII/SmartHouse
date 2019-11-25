@@ -10,9 +10,9 @@ bool check_EEPROM_init(void)
   {
     // Read data from EEPROM
     read_EEPROM(1, data);
-    strcpy(ssid, data);
+    strcpy(get_ssid(), data);
     read_EEPROM(1 + MAX_WIFI_LENGTH, data);
-    strcpy(pass, data);
+    strcpy(get_pass(), data);
     return true;
   }
   else

@@ -2,6 +2,9 @@
 // WiFi functions
 //
 
+char ssid[MAX_WIFI_LENGTH];
+char pass[MAX_WIFI_LENGTH];
+
 // Connect to WiFi network
 bool setup_WiFi() {
   int i = 0;
@@ -35,14 +38,46 @@ bool setup_WiFi() {
   return true;
 }
 
-void array_to_string(byte array[], unsigned int len, char buffer[])
+void init_WiFi()
 {
-    for (unsigned int i = 0; i < len; i++)
-    {
-        byte nib1 = (array[i] >> 4) & 0x0F;
-        byte nib2 = (array[i] >> 0) & 0x0F;
-        buffer[i*2+0] = nib1  < 0xA ? '0' + nib1  : 'A' + nib1  - 0xA;
-        buffer[i*2+1] = nib2  < 0xA ? '0' + nib2  : 'A' + nib2  - 0xA;
-    }
-    buffer[len*2] = '\0';
+  // Read SSID/pass from EEPROM
+  char data[MAX_WIFI_LENGTH];
+  read_EEPROM(1, data);
+  strcpy(ssid, data);
+  read_EEPROM(1 + MAX_WIFI_LENGTH, data);
+  strcpy(pass, data);
+
+  // Actively disconnect from any connected WiFi
+  WiFi.disconnect();
+  delay(100);
+  
+  if (setup_WiFi()) 
+  {
+    // Toggle valid WiFi data bit in EEPROM
+    EEPROM.write(0, 'W');
+    EEPROM.commit();  
+      
+    // Connect MQTT client
+    mqtt_client.setServer(broker, port);
+    
+    // Update blink interval
+    blink.set_interval(BLINK_CONFIGURED);
+    
+    // Report success to Python
+    Serial.println(F("OK"));  
+  } else {
+    // Report error to Python
+    Serial.println(F("E1: Unable to establish WiFi connection"));
+  }
+}
+
+char* get_ssid()
+{
+  return ssid;
+}
+
+
+char* get_pass()
+{
+  return pass;
 }

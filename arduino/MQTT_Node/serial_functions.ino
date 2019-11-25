@@ -26,17 +26,17 @@ void process_serial()
   if (strcmp(serial_buf, (char*) F("list_ssid")) == 0)
     list_SSID();
   else if (strcmp(serial_buf, (char*) F("set_ssid")) == 0)
-    set_WiFi(ssid, 1);
+    store_WiFi(1);
   else if (strcmp(serial_buf, (char*) F("set_pass")) == 0)
-    set_WiFi(pass, 1 + MAX_WIFI_LENGTH);
+    store_WiFi(1 + MAX_WIFI_LENGTH);
   else if (strcmp(serial_buf, (char*) F("init_wifi")) == 0)
     init_WiFi();
   else if (strcmp(serial_buf, (char*) F("reset")) == 0)
     EEPROM_reset();
   else if (strcmp(serial_buf, (char*) F("get_uuid")) == 0)
-    Serial.println(node_uuid);
+    Serial.println(get_uuid());
   else if (strcmp(serial_buf, (char*) F("get_ssid")) == 0)
-    Serial.println(ssid);
+    Serial.println(get_ssid());
   else if (strcmp(serial_buf, (char*) F("get_wifi_status")) == 0)
     Serial.println(WiFi.status());
   else if (strcmp(serial_buf, (char*) F("get_ip")) == 0)
@@ -51,39 +51,6 @@ void reset_serial_buffer(void)
   for(int i=0; i<SERIAL_BUF_LENGTH; i++)
   { // Initialize serial buffer
     serial_buf[i] = '\0';
-  }
-}
-
-void init_WiFi()
-{
-  // Read SSID/pass from EEPROM
-  char data[MAX_WIFI_LENGTH];
-  read_EEPROM(1, data);
-  strcpy(ssid, data);
-  read_EEPROM(1 + MAX_WIFI_LENGTH, data);
-  strcpy(pass, data);
-
-  // Actively disconnect from any connected WiFi
-  WiFi.disconnect();
-  delay(100);
-  
-  if (setup_WiFi()) 
-  {
-    // Toggle valid WiFi data bit in EEPROM
-    EEPROM.write(0, 'W');
-    EEPROM.commit();  
-      
-    // Connect MQTT client
-    mqtt_client.setServer(broker, port);
-    
-    // Update blink interval
-    blink.set_interval(BLINK_CONFIGURED);
-    
-    // Report success to Python
-    Serial.println(F("OK"));  
-  } else {
-    // Report error to Python
-    Serial.println(F("E1: Unable to establish WiFi connection"));
   }
 }
 
@@ -104,7 +71,7 @@ void list_SSID()
   Serial.println(F("}"));
 }
 
-void set_WiFi(char* data, int loc)
+void store_WiFi(int loc)
 {
   Serial.println(F("OK"));
   char c;

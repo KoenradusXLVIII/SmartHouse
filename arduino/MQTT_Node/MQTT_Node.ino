@@ -2,6 +2,8 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include <EEPROM.h>
+#include <ArduinoOTA.h>
+#include <ESP8266httpUpdate.h>
 
 // Private libraries
 #include <Blink.h>
@@ -13,20 +15,14 @@
 
 // Specific libraries
 
-// WiFi client configuration
-char ssid[MAX_WIFI_LENGTH];
-char pass[MAX_WIFI_LENGTH];
+// WiFi client
 WiFiClient WifiClient;
-int prev_rssi = 0;
-int rssi_buf[BUF_LENGTH];
 
-// Blink configuration
-Blink blink(LED_BUILTIN); 
-
-// MQTT configuration
+// MQTT client
 PubSubClient mqtt_client(WifiClient);
-char node_uuid[12];
-char charTopic[20];
+
+// Blink client
+Blink blink(LED_BUILTIN); 
 
 // Serial configuration
 char serial_buf[SERIAL_BUF_LENGTH];
@@ -38,9 +34,6 @@ Numpy np;
 // EEPROM
 bool EEPROM_initialized = false;
 
-// Global timing
-unsigned long longPrevious = millis();
-
 // ============================= //
 // SPECIFIC CONFIGURATION STARTS //
 // ============================= //
@@ -48,6 +41,7 @@ unsigned long longPrevious = millis();
 #define IO_COUNT 0
 int IO_ID[IO_COUNT] = {};
 int IO_pin[IO_COUNT] = {};
+unsigned long longPrevious[IO_COUNT+1];
 
 // ============================= //
 //  SPECIFIC CONFIGURATION ENDS  //
@@ -57,11 +51,6 @@ void setup() {
   // Setup serial connection
   Serial.begin(SERIAL_SPEED);
   Serial.println(F("."));
-
-  // Extract node UUID
-  byte mac[6];
-  WiFi.macAddress(mac);
-  array_to_string(mac, 6, node_uuid);
 
   // Initialise EEPROM
   EEPROM.begin(EEPROM_SIZE); 
@@ -74,16 +63,15 @@ void setup() {
     
     // Setup WiFi
     setup_WiFi();
+    set_uuid();
+
+    // Setup OTA
+    setup_OTA();
 
     // Setup MQTT broker connection
     mqtt_client.setServer(broker, port);
     mqtt_client.setCallback(callback);
-
-    // Subscribe to my MQTT topic
-    strcpy(charTopic, "nodes/");
-    strcat(charTopic, node_uuid);
-    strcat(charTopic, "/io/#");
-    mqtt_client.subscribe(charTopic);
+    mqtt_subscribe();
     
   } else {   
     // Node not configured for WiFi
@@ -94,6 +82,14 @@ void setup() {
 
     // Initialise serial interface for read
     reset_serial_buffer();
+
+    // Set I/O and timers
+    for (int i = 0; i < IO_COUNT; i++) {
+      pinMode(IO_pin[i], OUTPUT);
+      digitalWrite(IO_pin[i], LOW);
+      longPrevious[i] = millis();
+    }
+    longPrevious[IO_COUNT] = millis();
 
     // ===================== //
     // SPECIFIC SETUP STARTS //
@@ -109,7 +105,7 @@ void loop() {
   // Blink handling
   blink.update();
 
-  // Listen on serial port
+  // Handle serial traffic
   listen_serial();
     
   if (EEPROM_initialized)
