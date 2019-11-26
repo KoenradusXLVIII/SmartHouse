@@ -85,3 +85,10 @@ class Client:
         self._mqtt_client.publish(topic, value, retain=True)
         self._mqtt_client.disconnect()
         print(topic, value)
+
+    def set(self, node, sensor_id, value):
+        topic = 'nodes/%s/io/%s' % (node, sensor_id)
+        self._mqtt_client.connect(self._host, self._port)
+        self._mqtt_client.publish(topic, value, retain=True)
+        self._mqtt_client.disconnect()
+        print(topic, value)

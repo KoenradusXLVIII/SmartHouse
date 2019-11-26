@@ -108,6 +108,21 @@ void mqtt_reconnect() {
   }
 }
 
+void mqtt_topic(char* topic, int sensor_id, char* pub_topic) {
+    char charID[MAX_LENGTH_SIGNED_INT];
+    strcpy(pub_topic, (const char *) F("nodes/"));
+    strcat(pub_topic, node_uuid);
+    if (strcmp(topic, "") == 0)
+      strcat(pub_topic, (const char *) F("/sensors/"));
+    else
+      strcat(pub_topic, topic);
+    if (strcmp(topic, "") == 0)
+    {
+      itoa(sensor_id, charID, 10);
+      strcat(pub_topic, charID);
+    }
+}
+
 void mqtt_publish(int sensor_id, float value, int io_id, char* topic, int interval) {
   unsigned long longNow = millis();
   
@@ -121,21 +136,13 @@ void mqtt_publish(int sensor_id, float value, int io_id, char* topic, int interv
   
     // Prepare topic
     char charTopicPub[TOPIC_LENGTH];
-    char charID[MAX_LENGTH_SIGNED_INT];
+    mqtt_topic(topic, sensor_id, charTopicPub);
+
+    // Prepare value
     char charValue[6];
-    strcpy(charTopicPub, (const char *) F("nodes/"));
-    strcat(charTopicPub, node_uuid);
-    if (strcmp(topic, "") == 0)
-      strcat(charTopicPub, (const char *) F("/sensors/"));
-    else
-      strcat(charTopicPub, topic);
-    if (strcmp(topic, "") == 0)
-    {
-      itoa(sensor_id, charID, 10);
-      strcat(charTopicPub, charID);
-    }
     dtostrf(value, 1, 2, charValue);
-  
+
+    // Publish
     Serial.print(F("MQTT upload on topic: "));
     Serial.print(charTopicPub);
     Serial.print(F(" => "));
@@ -179,4 +186,18 @@ void mqtt_rssi(bool timed) {
       mqtt_publish(rssi, IO_COUNT, topic, 1);   // Publish RSSI to last IO position
     else
       mqtt_publish(rssi, IO_COUNT, topic, 0);   // Publish RSSI to last IO position
+}
+
+void mqtt_ssid() {
+  char* topic = "/ssid";
+  char topic_pub[TOPIC_LENGTH];
+
+  // MQTT client connection
+  if (!mqtt_client.connected())  // Reconnect if connection is lost
+    mqtt_reconnect();
+  
+  // Prepare topic
+  mqtt_topic(topic, 0, topic_pub);
+  mqtt_client.publish(topic_pub, get_ssid(), true);
+    
 }

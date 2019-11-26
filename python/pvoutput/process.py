@@ -71,7 +71,7 @@ def main():
     if verbose:
         print('Get PV and Water data...')
 
-    mqtt_payload = mqtt_client.get(filter=[6, 7, 47])
+    mqtt_payload = mqtt_client.get(filter=[6, 7, 47], type='float')
 
     if len(mqtt_payload):
         # Post-process water data
@@ -186,7 +186,7 @@ def main():
     if verbose:
             print('Post Nebula payload..')
             print('Nebula payload: %s' % payload)
-    r = nebula_client.post_many(payload)
+    #r = nebula_client.post_many(payload)
     nebula_client.info('Nebula upload: %s' % r.text)
     nebula_client.debug('Nebula payload: %s' % payload)
 

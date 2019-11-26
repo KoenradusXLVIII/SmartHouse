@@ -38,9 +38,9 @@ bool EEPROM_initialized = false;
 // SPECIFIC CONFIGURATION STARTS //
 // ============================= //
 
-#define IO_COUNT 1
-int IO_ID[IO_COUNT] = {85};
-int IO_pin[IO_COUNT] = {-1};
+#define IO_COUNT 3
+int IO_ID[IO_COUNT] = {6, 47, 7};
+int IO_pin[IO_COUNT] = {-1, -1, -1};
 unsigned long longPrevious[IO_COUNT+1];
 
 // ============================= //
@@ -83,6 +83,7 @@ void setup() {
     }
     Serial.println();
     mqtt_rssi(false);
+    mqtt_ssid();
 
     // Set I/O and timers
     for (int i = 0; i < IO_COUNT; i++) {

@@ -105,6 +105,7 @@ void setup() {
     }
     Serial.println();
     mqtt_rssi(false);
+    mqtt_ssid();
 
     // Set I/O and timers
     for (int i = 0; i < IO_COUNT; i++) {

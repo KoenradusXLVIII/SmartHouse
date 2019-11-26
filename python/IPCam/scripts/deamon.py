@@ -136,14 +136,14 @@ def main():
 
                 # Strobe handling
                 strobe = ON
-                mqtt_client.publish(cfg['mqtt']['nodes']['motor'], cfg['mqtt']['sensors']['strobe'], ON)
+                mqtt_client.set(cfg['mqtt']['nodes']['motor'], cfg['mqtt']['sensors']['strobe'], ON)
 
             # Light handling
             day_night = mqtt_client.get_single(cfg['mqtt']['sensors']['day_night'])
             if day_night == NIGHT:
                 # It is dark out so we should turn the light on
                 motor_light = ON
-                mqtt_client.publish(cfg['mqtt']['nodes']['motor'], cfg['mqtt']['sensors']['motor_light'], ON)
+                mqtt_client.set(cfg['mqtt']['nodes']['motor'], cfg['mqtt']['sensors']['motor_light'], ON)
 
             last_motion = time.time()
         elif strobe or motor_light:
@@ -156,15 +156,15 @@ def main():
                 if (time.time() - last_motion) > cfg['ipcam']['motion_timeout']:
                     if strobe == ON:
                         strobe = OFF
-                        mqtt_client.publish(cfg['mqtt']['nodes']['motor'], cfg['mqtt']['sensors']['strobe'], OFF)
+                        mqtt_client.set(cfg['mqtt']['nodes']['motor'], cfg['mqtt']['sensors']['strobe'], OFF)
                     if motor_light == ON:
                         motor_light = OFF
-                        mqtt_client.publish(cfg['mqtt']['nodes']['motor'], cfg['mqtt']['sensors']['motor_light'], OFF)
+                        mqtt_client.set(cfg['mqtt']['nodes']['motor'], cfg['mqtt']['sensors']['motor_light'], OFF)
 
         # Check for day/night transitions
         night = IPCam_garden.delta_day_night()
         if night is not None:
-            mqtt_client.publish(cfg['mqtt']['nodes']['guardhouse'], cfg['mqtt']['sensors']['day_night'], night)
+            mqtt_client.set(cfg['mqtt']['nodes']['guardhouse'], cfg['mqtt']['sensors']['day_night'], night)
 
             if night:
                 talk_log('Transition to night written to Arduino Guardhouse', 'info', nebula_client=nebula_client)
