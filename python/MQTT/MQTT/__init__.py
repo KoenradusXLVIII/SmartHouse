@@ -83,8 +83,18 @@ class Client:
         topic = 'nodes/%s/sensors/%s' % (node, sensor_id)
         self._mqtt_client.connect(self._host, self._port)
         self._mqtt_client.publish(topic, value, retain=True)
+        self._mqtt_client.loop()
         self._mqtt_client.disconnect()
         print(topic, value)
+
+    def publish_image(self, node, image):
+        topic = 'nodes/%s/image' % node
+        self._mqtt_client.connect(self._host, self._port)
+        self._mqtt_client.publish(topic, image, retain=False)
+        self._mqtt_client.loop()
+        time.sleep(5)
+        self._mqtt_client.disconnect()
+        print(topic, 'image')
 
     def set(self, node, sensor_id, value):
         topic = 'nodes/%s/io/%s' % (node, sensor_id)
@@ -92,3 +102,5 @@ class Client:
         self._mqtt_client.publish(topic, value, retain=True)
         self._mqtt_client.disconnect()
         print(topic, value)
+
+

@@ -140,7 +140,7 @@ void mqtt_publish(int sensor_id, float value, int io_id, char* topic, int interv
 
     // Prepare value
     char charValue[6];
-    dtostrf(value, 1, 2, charValue);
+    dtostrf(value, 1, 0, charValue);
 
     // Publish
     Serial.print(F("MQTT upload on topic: "));

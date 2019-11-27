@@ -11,10 +11,8 @@ from datetime import datetime
 
 # Private packages
 import IPCam
-import pushover
-import nebula
-import hue
 import MQTT
+import hue
 
 # Constants
 OFF = 0
@@ -68,13 +66,12 @@ def main():
     fp = open(path + '/config.yaml', 'r')
     cfg = yaml.load(fp)
 
-    # Set up Nebula API client
-    nebula_client = nebula.Client(**cfg['nebula'])
-    nebula_client.set_level(nebula.INFO)
-
     # Set up MQTT client
     mqtt_client = MQTT.Client(**cfg['mqtt'])
     mqtt_client.subscribe('nodes/#')
+
+    # Set up Hue client
+    hue_client = hue.Client(**cfg['hue'])
 
     # Start deamon
     # PID file location
@@ -90,10 +87,7 @@ def main():
         with open(pidfile, 'r') as fp:
             pid = int(fp.read())
             if psutil.pid_exists(pid):
-                nebula_client.debug('IPCam deamon still running with PID %s' % pid)
                 sys.exit()
-            else:
-                nebula_client.critical('IPCam deamon with PID %s crashed!' % pid)
 
     # Initialize logging
     init_log('IPCam deamon')
@@ -101,7 +95,7 @@ def main():
     # Register current deamon
     with open(pidfile, 'w') as fp:
         pid = str(os.getpid())
-        talk_log('Registering IPCam deamon with PID %s' % pid, 'info', nebula_client=nebula_client)
+        talk_log('Registering IPCam deamon with PID %s' % pid, 'info')
         fp.write(pid)
 
     # Set up IPCam clients
@@ -110,70 +104,38 @@ def main():
     IPCam_garden = IPCam.Client(**cfg['ipcam']['garden'])
     IPCam_garden.set_base_path(recording_dir)
 
-    # Set up Pushover client
-    pushover_client = pushover.Client(**cfg['pushover'])
-
-    # Set up Hue client
-    hue_client = hue.Client(**cfg['hue'])
-
     # Local variables
     last_motion = 0
-    strobe = 0
-    motor_light = 0
+    alarm_on = False;
 
     while True:
         # Check for new motion at Motor IPCam, unless the alarm or the light is already on
-        if IPCam_motor.new_recording() and not (strobe or motor_light):
-            # New motion detected!
-            # Is the alarm enabled?
-
-            alarm_mode = mqtt_client.get_single(cfg['mqtt']['sensors']['alarm_mode'])
-            if alarm_mode:
-                # Push alarm to smartphone and log
-                pushover_client.message('Alarm triggered!', IPCam_motor.snapshot(), 'GuardHouse Security', 'high', 'alien')
-                talk_log('Alarm triggered!', 'info', nebula_client=nebula_client)
-
-                # Strobe handling
-                strobe = ON
-                mqtt_client.set(cfg['mqtt']['nodes']['motor'], cfg['mqtt']['sensors']['strobe'], ON)
-
-            # Light handling
-            day_night = mqtt_client.get_single(cfg['mqtt']['sensors']['day_night'])
-            if day_night == NIGHT:
-                # It is dark out so we should turn the light on
-                motor_light = ON
-                mqtt_client.set(cfg['mqtt']['nodes']['motor'], cfg['mqtt']['sensors']['motor_light'], ON)
-
+        if IPCam_motor.new_recording():
+            mqtt_client.publish(cfg['mqtt']['nodes']['smarthouse'], 93, 1)
+            mqtt_client.publish_image('00626E6DF34', IPCam_motor.snapshot())
             last_motion = time.time()
-        elif strobe or motor_light:
-            # Alarm or the light is on, but is motion still ongoing?
+            alarm_on = True;
+        elif alarm_on:
+            # Alarm on, but is motion still ongoing?
             if IPCam_motor.motion_detect():
                 # Motion still ongoing
                 last_motion = time.time()
             else:
                 # Motion no longer ongoing, wait for timeout
                 if (time.time() - last_motion) > cfg['ipcam']['motion_timeout']:
-                    if strobe == ON:
-                        strobe = OFF
-                        mqtt_client.set(cfg['mqtt']['nodes']['motor'], cfg['mqtt']['sensors']['strobe'], OFF)
-                    if motor_light == ON:
-                        motor_light = OFF
-                        mqtt_client.set(cfg['mqtt']['nodes']['motor'], cfg['mqtt']['sensors']['motor_light'], OFF)
+                    mqtt_client.publish(cfg['mqtt']['nodes']['smarthouse'], 93, 0)
+                    alarm_on = False;
 
         # Check for day/night transitions
         night = IPCam_garden.delta_day_night()
         if night is not None:
-            mqtt_client.set(cfg['mqtt']['nodes']['guardhouse'], cfg['mqtt']['sensors']['day_night'], night)
+            mqtt_client.publish(cfg['mqtt']['nodes']['guardhouse'], cfg['mqtt']['sensors']['day_night'], night)
 
             if night:
-                talk_log('Transition to night written to Arduino Guardhouse', 'info', nebula_client=nebula_client)
                 # If no one home turns lights on in 'not home' mode
                 if hue_client.get_all_off():
                     hue_client.set_scene('Not home')
-                    talk_log('Switching lights on to "Not home" mode', 'info', nebula_client=nebula_client)
-            else:  # If not night, then day
-                talk_log('Transition to day written to Arduino Guardhouse', 'info', nebula_client=nebula_client)
-
+                    talk_log('Switching lights on to "Not home" mode', 'info')
 
 
 # Start of program
