@@ -28,8 +28,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
   {
     int intSensorID;
     int intValue;
-    sscanf(topic, "%*s %*s %*s %d", intSensorID);  
-    sscanf(charPayload, "%d", intValue);
+    sscanf(topic, "%*s %*s %*s %d", &intSensorID);  
+    sscanf(charPayload, "%d", &intValue);
     Serial.print(F("Received IO message for :"));
     Serial.print(intSensorID);
     Serial.print(F(" => "));
@@ -151,29 +151,29 @@ void mqtt_publish(int sensor_id, float value, int io_id, char* topic, int interv
   }
 }
 
-void mqtt_publish(int io_id, float value, int interval) {
-  // Publish float with io_id and interval, without io_pin
-  mqtt_publish(io_id, value, 0, "", interval);
-}
-
 void mqtt_publish(int io_id, float value) {
-  // Publish float with io_id, without id_pin and interval
+  // Publish float with io_id, without timer_id and interval
   mqtt_publish(io_id, value, 0, "", 0);
 }
 
-void mqtt_publish(int io_id, int value, int io_pin) {
-  // Publish int with io_id and io_pin, without interval
-  mqtt_publish(io_id, (float) value, io_pin, "", 0);
+void mqtt_publish(int io_id, float value, int timer_id, int interval) {
+  // Publish float with io_id, timer_id and interval
+  mqtt_publish(io_id, value, timer_id, "", interval);
 }
 
-void mqtt_publish(int io_id, int value, int io_pin, int interval) {
-  // Publish int with io_id, io_pin and interval
-  mqtt_publish(io_id, (float) value, io_pin, "", interval);
+void mqtt_publish(int io_id, int value) {
+  // Publish int with io_id, without timer_id and interval
+  mqtt_publish(io_id, value, 0, "", 0);
 }
 
-void mqtt_publish(int value, int counter_id, char* topic, int interval) {
-  // Publish integer with counter_id to topic with interval
-  mqtt_publish(0, (float) value, counter_id, topic, interval);
+void mqtt_publish(int io_id, int value, int timer_id, int interval) {
+  // Publish int with io_id, timer_id and interval
+  mqtt_publish(io_id, (float) value, timer_id, "", interval);
+}
+
+void mqtt_publish(int value, int timer_id, char* topic, int interval) {
+  // Publish integer to topic with timer_id and interval
+  mqtt_publish(0, (float) value, timer_id, topic, interval);
 }
 
 void mqtt_rssi(bool timed) {
