@@ -69,6 +69,7 @@ int prev_valve_state = CLOSED;        // Default to close
 int prev_water_override = AUTO;       // Default to auto
 int prev_light_state = OFF;           // Default to off
 int prev_light_override = AUTO;       // Default to auto
+int prev_light_sensor = DAY;          // Default to day
 
 // Timers
 #define LIGHT_DELAY 60000             // Leave light on for 1 minute (60.000ms)
@@ -193,87 +194,49 @@ void door_state()
   if (prev_door_state != cur_door_state)
   {
     prev_door_state = cur_door_state;
-    Serial.println(cur_door_state);
     mqtt_publish(IO_ID[DOOR_STATE], cur_door_state); 
   }
 }
 
 void light_control(void)
 {
-  // Read current value of outputs
-  int cur_door_state = digitalRead(IO_pin[DOOR_STATE]);
   int cur_light_state = digitalRead(IO_pin[LIGHT_STATE]);
-
-  // Read inputs
-  int light_sensor = digitalRead(IO_pin[AMBIENT_LIGHT_STATE]);
-  int light_override = digitalRead(IO_pin[LIGHT_OVERRIDE]);
-  
-  if((prev_door_state == OPEN) and (cur_door_state == CLOSED)) {
-    // Door was open and is now closed, start countdown
-    door_close_time = millis();
-    door_timer_on = true;
-    mqtt_publish(IO_ID[DOOR_STATE], cur_door_state); 
-  } else if ((prev_door_state == CLOSED) and (cur_door_state == CLOSED)) {
-    // Door was closed and is closed
-    if(door_timer_on) {
-      if ((millis() - door_close_time) > LIGHT_DELAY) {
-        // Timer has expired, turn light off
-        cur_light_state = OFF;
-        door_timer_on = false;
-      }
-    }
-  } else { // cur_door_state == OPEN
-    // Door is open, ...
-    if (prev_door_state == CLOSED)
-      mqtt_publish(IO_ID[DOOR_STATE], cur_door_state); 
-    if (cur_light_state == ON)
-      light_sensor = DARK;
-    if ((light_override == AUTO) and (light_sensor == DARK)) {
-      // ... if no overrides present.
-      cur_light_state = ON;
-    } else {
-       // ... otherwise turn OFF
-      cur_light_state = OFF;
-    }
-  }
-
-  if (prev_light_override != light_override)
-    mqtt_publish(IO_ID[LIGHT_OVERRIDE], light_override); 
+  int cur_light_sensor = digitalRead(IO_pin[AMBIENT_LIGHT_STATE]);
+  int cur_light_override = digitalRead(IO_pin[LIGHT_OVERRIDE]);
 
   if (prev_light_state != cur_light_state)
   {
-    digitalWrite(IO_pin[LIGHT_STATE], cur_light_state);    
+    prev_light_state = cur_light_state;
     mqtt_publish(IO_ID[LIGHT_STATE], cur_light_state); 
   }
-  prev_door_state = cur_door_state;
-  prev_light_state = cur_light_state;
-  prev_light_override = light_override;
+  if (prev_light_sensor != cur_light_sensor)
+  {
+    prev_light_sensor = cur_light_sensor;
+    mqtt_publish(IO_ID[AMBIENT_LIGHT_STATE], cur_light_sensor); 
+  }
+  if (prev_light_override != cur_light_override)
+  {
+    prev_light_override = cur_light_override;
+    mqtt_publish(IO_ID[LIGHT_OVERRIDE], cur_light_override); 
+  }
+  
 }
 
 void water_control(void)
 {
-  int water_override = digitalRead(IO_pin[WATER_OVERRIDE]);
-  int valve_state = digitalRead(IO_pin[VALVE_STATE]);
-  
-  if ((water_override == MANUAL) and (prev_water_override == AUTO)) {
-    // Store previous valve state
-    prev_valve_state = valve_state;
-    // Manual override on water, set valve to OPEN
-    valve_state = OPEN;
-    mqtt_publish(IO_ID[WATER_OVERRIDE], water_override); 
-  } else if ((water_override == AUTO) and (prev_water_override == MANUAL)){
-    // Manual override on water lifted, restore previous value
-    valve_state = prev_valve_state;    
-    mqtt_publish(IO_ID[WATER_OVERRIDE], water_override); 
-  }
+  int cur_water_override = digitalRead(IO_pin[WATER_OVERRIDE]);
+  int cur_valve_state = digitalRead(IO_pin[VALVE_STATE]);
 
-  if (valve_state != prev_valve_state)
+  if (prev_water_override != cur_water_override)
   {
-    digitalWrite(IO_pin[VALVE_STATE], valve_state);  
-    mqtt_publish(IO_ID[VALVE_STATE], valve_state); 
+    prev_water_override = cur_water_override;
+    mqtt_publish(IO_ID[WATER_OVERRIDE], cur_water_override); 
   }
-
-  prev_water_override = water_override;
+  if (prev_valve_state != cur_valve_state)
+  {
+    prev_valve_state = cur_valve_state;
+    mqtt_publish(IO_ID[VALVE_STATE], cur_valve_state); 
+  }
 }
 
 void rain_sensor(void)
