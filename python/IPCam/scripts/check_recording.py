@@ -124,18 +124,7 @@ def main():
                 # Motion no longer ongoing, wait for timeout
                 if (time.time() - last_motion) > cfg['ipcam']['motion_timeout']:
                     mqtt_client.publish(cfg['mqtt']['nodes']['smarthouse'], 93, 0)
-                    alarm_on = False;
-
-        # Check for day/night transitions
-        night = IPCam_garden.delta_day_night()
-        if night is not None:
-            mqtt_client.publish(cfg['mqtt']['nodes']['guardhouse'], cfg['mqtt']['sensors']['day_night'], night)
-
-            if night:
-                # If no one home turns lights on in 'not home' mode
-                if hue_client.get_all_off():
-                    hue_client.set_scene('Not home')
-                    talk_log('Switching lights on to "Not home" mode', 'info')
+                    alarm_on = False
 
 
 # Start of program
