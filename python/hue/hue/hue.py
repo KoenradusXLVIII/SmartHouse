@@ -8,7 +8,9 @@ class Client:
         self.lights = self.bridge.lights
         self.scenes = self.bridge.scenes
         self.groups = self.bridge.groups
-        self.last_lights = []
+
+        # Internal variables
+        self._last_lights = []
 
     def check_scene_active(self, scene):
         for id in scene['lights']:
@@ -25,7 +27,6 @@ class Client:
                 # Light should be off, verify that it is
                 if self.lights[id].on:
                     return False
-
         return True
 
     def set_scene(self, name):
@@ -42,9 +43,9 @@ class Client:
             else:
                 lights.append({'id': light.light_id,  'brightness': '', 'xy': ''})
 
-        if lights != self.last_lights:
-            self.last_lights = lights
-            return self.last_lights
+        if lights != self._last_lights:
+            self._last_lights = lights
+            return self._last_lights
 
     def set_all_off(self):
         self.groups[0].on = False
