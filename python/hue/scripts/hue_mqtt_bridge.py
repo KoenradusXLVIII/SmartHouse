@@ -68,11 +68,9 @@ def main():
     # Start deamon
     # PID file location
     if platform.system() == 'Windows':
-        pidfile = 'c:\\tmp\\IPCam_daemon.pid'
-        recording_dir = 'S:\\WCAU45635050\\webcam'
+        pidfile = 'c:\\tmp\\Hue_MQTT_daemon.pid'
     elif platform.system() == 'Linux':
-        pidfile = '/tmp/IPCam_daemon.pid'
-        recording_dir = '/home/pi/WCAU45635050/webcam'
+        pidfile = '/tmp/Hue_MQTT_daemon.pid'
 
     # Check if deamon already running
     if os.path.isfile(pidfile):
