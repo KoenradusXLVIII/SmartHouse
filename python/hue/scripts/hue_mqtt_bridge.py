@@ -20,6 +20,11 @@ cfg = yaml.load(fp)
 
 # Set up Hue client
 hue_client = hue.Client(cfg['hue']['ip'])
+hue_client.set_alarm_lights_by_name(['TV Meubel', 'Keuken - nis'])
+
+# Global variables
+alarm = False
+alarm_enabled = True
 
 # Functions
 def log_except_hook(*exc_info):
@@ -55,13 +60,30 @@ def talk_log(msg, level='info', verbose=True):
 
 # The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
+    global alarm
+    global alarm_enabled
+
+    msg.payload = msg.payload.decode('UTF-8')
+    if msg.topic == 'nodes/3C71BF3163BD/io/16':
+        if msg.payload == '1':
+            alarm_enabled = True
+            print('Alarm enabled')
+        else:
+            alarm_enabled = False
+            print('Alarm disabled')
+
     if not msg.retain:
-        msg.payload = msg.payload.decode('UTF-8')
         talk_log('%s => [%s]' % (msg.topic, msg.payload))
         if msg.payload == 'Not home':
             hue_client.set_scene(msg.payload)
         elif msg.payload == 'All off':
             hue_client.set_all_off();
+        elif msg.topic == 'nodes/B827EBF288F8/sensors/93':
+            if msg.payload == '1':
+                alarm = True
+                print('Alarm triggered!')
+            else:
+                alarm = False
 
 # Main function
 def main():
@@ -93,16 +115,22 @@ def main():
     mqtt_client.on_message = on_message
     mqtt_client.username_pw_set(username=cfg['mqtt']['username'], password=cfg['mqtt']['password'])
     mqtt_client.connect(cfg['mqtt']['host'], cfg['mqtt']['port'])
-    mqtt_client.subscribe("hue/#")
+    mqtt_client.subscribe('hue/#')
+    mqtt_client.subscribe('nodes/B827EBF288F8/sensors/93')
+    mqtt_client.subscribe('nodes/3C71BF3163BD/io/16')
+    mqtt_client.loop_start()
 
     # Local initialisation
     last_published_scene = ''
     start_time = time.time() - cfg['hue']['refresh_rate']
 
     while True:
-        time.sleep(1)
-        mqtt_client.loop()
+        time.sleep(3)
 
+        # Alarm handling
+        hue_client.alarm(alarm)
+
+        # Scene handling
         if time.time() - start_time > cfg['hue']['refresh_rate']:
             if hue_client.get_all_off():
                 current_scene = 'All off'
