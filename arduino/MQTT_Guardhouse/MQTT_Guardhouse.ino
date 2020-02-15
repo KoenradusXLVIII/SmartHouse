@@ -71,11 +71,6 @@ int prev_light_state = OFF;           // Default to off
 int prev_light_override = AUTO;       // Default to auto
 int prev_light_sensor = DAY;          // Default to day
 
-// Timers
-#define LIGHT_DELAY 60000             // Leave light on for 1 minute (60.000ms)
-bool door_timer_on = false;       
-unsigned long door_close_time;
-
 // ============================= //
 //  SPECIFIC CONFIGURATION ENDS  //
 // ============================= //
@@ -182,8 +177,10 @@ void DHT21()
 {
   // DHT21 handling
   DHT.read21(DHT21_PIN);
+  // Add to rotating buffer
   np.add_to_buffer(DHT.temperature, buf_temp, BUF_LENGTH);
   np.add_to_buffer(DHT.humidity, buf_humi, BUF_LENGTH);
+  // Publish filtered mean every 1 minute
   mqtt_publish(IO_ID[TEMP], np.filt_mean(buf_temp, BUF_LENGTH, 1), TEMP, 1);  
   mqtt_publish(IO_ID[HUMI], np.filt_mean(buf_humi, BUF_LENGTH, 1), HUMI, 1);  
 }
@@ -200,15 +197,9 @@ void door_state()
 
 void light_control(void)
 {
-  int cur_light_state = digitalRead(IO_pin[LIGHT_STATE]);
   int cur_light_sensor = digitalRead(IO_pin[AMBIENT_LIGHT_STATE]);
   int cur_light_override = digitalRead(IO_pin[LIGHT_OVERRIDE]);
-
-  if (prev_light_state != cur_light_state)
-  {
-    prev_light_state = cur_light_state;
-    mqtt_publish(IO_ID[LIGHT_STATE], cur_light_state); 
-  }
+  
   if (prev_light_sensor != cur_light_sensor)
   {
     prev_light_sensor = cur_light_sensor;
@@ -219,23 +210,16 @@ void light_control(void)
     prev_light_override = cur_light_override;
     mqtt_publish(IO_ID[LIGHT_OVERRIDE], cur_light_override); 
   }
-  
 }
 
 void water_control(void)
 {
   int cur_water_override = digitalRead(IO_pin[WATER_OVERRIDE]);
-  int cur_valve_state = digitalRead(IO_pin[VALVE_STATE]);
 
   if (prev_water_override != cur_water_override)
   {
     prev_water_override = cur_water_override;
     mqtt_publish(IO_ID[WATER_OVERRIDE], cur_water_override); 
-  }
-  if (prev_valve_state != cur_valve_state)
-  {
-    prev_valve_state = cur_valve_state;
-    mqtt_publish(IO_ID[VALVE_STATE], cur_valve_state); 
   }
 }
 
