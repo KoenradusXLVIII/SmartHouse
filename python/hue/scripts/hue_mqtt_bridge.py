@@ -128,7 +128,8 @@ def main():
         time.sleep(3)
 
         # Alarm handling
-        hue_client.alarm(alarm)
+        if alarm_enabled:
+            hue_client.alarm(alarm)
 
         # Scene handling
         if time.time() - start_time > cfg['hue']['refresh_rate']:

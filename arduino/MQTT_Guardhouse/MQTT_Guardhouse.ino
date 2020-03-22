@@ -190,6 +190,7 @@ void door_state()
   int cur_door_state = digitalRead(IO_pin[DOOR_STATE]);
   if (prev_door_state != cur_door_state)
   {
+    // Only publish change in state
     prev_door_state = cur_door_state;
     mqtt_publish(IO_ID[DOOR_STATE], cur_door_state); 
   }
@@ -202,11 +203,13 @@ void light_control(void)
   
   if (prev_light_sensor != cur_light_sensor)
   {
+    // Only publish change in state
     prev_light_sensor = cur_light_sensor;
     mqtt_publish(IO_ID[AMBIENT_LIGHT_STATE], cur_light_sensor); 
   }
   if (prev_light_override != cur_light_override)
   {
+    // Only publish change in state
     prev_light_override = cur_light_override;
     mqtt_publish(IO_ID[LIGHT_OVERRIDE], cur_light_override); 
   }
@@ -218,6 +221,7 @@ void water_control(void)
 
   if (prev_water_override != cur_water_override)
   {
+    // Only publish change in state
     prev_water_override = cur_water_override;
     mqtt_publish(IO_ID[WATER_OVERRIDE], cur_water_override); 
   }
