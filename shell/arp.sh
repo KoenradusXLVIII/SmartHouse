@@ -10,23 +10,23 @@
 # ---------------------------------------------------
 # Declaration of script variables
 # ---------------------------------------------------
-MAC_JOOST="ec:9b:f3:63:92:ba"
-STATEFILE_JOOST="/home/pi/shell_scripts/ARP_JOOST"
-LOGFILE="/home/pi/shell_scripts/arp.log"
+MAC_ONEPLUS6="c0:ee:fb:05:1c:0a"
+MAC_ONEPLUS6_MQTT="C0EEFB051C0A"
 
 # ---------------------------------------------------
 # Main program loop 
 # ---------------------------------------------------
 
-PrevState_Joost=$(cat $STATEFILE_JOOST)
-echo $PrevState_Joost
-CurState_Joost=$(sudo arp-scan --localnet | grep $MAC_JOOST | wc -l | tee $STATEFILE_JOOST) 
-echo $CurState_Joost
+present=$(sudo arp-scan --localnet | grep $MAC_ONEPLUS6 | wc -l) 
 
-if [ $CurState_Joost != $PrevState_Joost ]; then
-	if [ $CurState_Joost = 1 ]; then
-		echo "$(date): Joost arrived home" >> $LOGFILE 
-	else
-		echo "$(date): Joost left home" >> $LOGFILE 
+if [ $present = 1 ]; then
+	mosquitto_pub -h joostverberk.nl -m "1" -t "nodes/B827EBF288F8/devices/$MAC_ONEPLUS6_MQTT" -u "vjmpotre" -P "#ukELk48z0js" -r
+	if [ "$1" = "-v" ]; then
+		echo "$MAC_ONEPLUS6 detected on network"	
+	fi
+else
+	mosquitto_pub -h joostverberk.nl -m "0" -t "nodes/B827EBF288F8/devices/$MAC_ONEPLUS6_MQTT" -u "vjmpotre" -P "#ukELk48z0js" -r
+	if [ "$1" = "-v" ]; then
+		echo "$MAC_ONEPLUS6 not detected on network"	
 	fi
 fi

@@ -12,6 +12,12 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 25 6	* * *	root	test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.daily )
 47 6	* * 7	root	test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.weekly )
 52 6	1 * *	root	test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.monthly )
-#*/5 * * * *	root	/usr/bin/python /home/pi/repository/python/pvoutput/process.py cron >/dev/null 2>&1
-0 * 	* * *	root	/bin/sh /home/pi/repository/shell/pvoutput/scripts/check_P1_daemon.sh >/dev/null 2>&1
-#
+* * * * *	root	/usr/bin/python3 /home/pi/repository/python/pvoutput/p1_poller.py >/dev/null 2>&1
+* * * * *	root	/bin/bash /home/pi/repository/shell/arp.sh 2>&1
+@reboot root ifdown wlan0
+#@reboot root mount /dev/sda1 /media/usb/ -o uid=pi,gid=pi
+#0 * * * * root /usr/bin/python3 /home/pi/repository/python/rainman/rainman.py >/dev/null 2>&1
+#6 * * * * root /usr/bin/python3 /home/pi/repository/python/rainman/sprinkler.py -off >/dev/null 2>&1
+0 * * * * root /usr/bin/python3 /home/pi/repository/python/IPCam/scripts/check_recording.py 2>&1
+2 0 * * * root /usr/bin/python3 /home/pi/repository/python/IPCam/scripts/rotate_video.py >/dev/null 2>&1
+48 0 * * 1 root /usr/bin/python3 /home/pi/repository/python/JSync/jsync.py >/dev/null 2>&1 

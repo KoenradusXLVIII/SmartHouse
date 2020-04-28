@@ -10,7 +10,7 @@ import time
 
 # Configuration variables
 backup_src = '/home/pi/WCAU45115692'
-backup_dirs = ['Negatives', 'Photos', 'Spark', 'GoPro']
+backup_dirs = ['Negatives', 'Photos', 'Spark', 'GoPro', 'Documents']
 backup_dst = '/home/pi/WCAU45635050/Backup'
 
 # Functions
@@ -73,7 +73,6 @@ if __name__ == '__main__':
                     talk_log('Found updated file to backup: %s' % file)
                     updated += 1
                     copyfile(file_src, file_dst)
-    
+
     elapsed_time = time.time() - start
     talk_log('JSync completed in %d minutes. %d new files copied. %d files updated.' % (elapsed_time / 60, new, updated))
-

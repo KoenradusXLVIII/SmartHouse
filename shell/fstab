@@ -1,0 +1,7 @@
+proc            /proc           proc    defaults          0       0
+/dev/mmcblk0p1  /boot           vfat    defaults          0       2
+/dev/mmcblk0p2  /               ext4    defaults,noatime  0       1
+UUID=c4b824ba-40c2-42b0-96e0-8964d2ebd9cb /home/pi/WCAU45635050 ext3 rw,relatime,data=ordered 0 0
+UUID=29e16994-16e8-43b5-ba27-3c0fd782fedc /home/pi/WCAU45115692 ext3 rw,relatime,data=ordered 0 0
+# a swapfile is not a swap partition, no line here
+#   use  dphys-swapfile swap[on|off]  for that
