@@ -16,7 +16,7 @@ import hue
 # Load configuration YAML
 path = os.path.dirname(os.path.realpath(__file__))
 fp = open(path + '/config.yaml', 'r')
-cfg = yaml.load(fp)
+cfg = yaml.safe_load(fp)
 
 # Set up Hue client
 hue_client = hue.Client(cfg['hue']['ip'])
@@ -93,6 +93,10 @@ def main():
         pidfile = 'c:\\tmp\\Hue_MQTT_daemon.pid'
     elif platform.system() == 'Linux':
         pidfile = '/tmp/Hue_MQTT_daemon.pid'
+
+    # Check if tmp directory exists:
+    if not os.path.exists(os.path.dirname(pidfile)):
+        os.mkdir(os.path.dirname(pidfile))
 
     # Check if deamon already running
     if os.path.isfile(pidfile):

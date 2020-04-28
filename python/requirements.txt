@@ -1,0 +1,37 @@
+-e git+https://github.com/KoenradusXLVIII/SmartHouse@93913c6253d6545ed67a53a90cb72d4a412b214a#egg=arduino&subdirectory=python\arduino
+atomicwrites==1.3.0
+attrs==19.3.0
+certifi==2020.4.5.1
+chardet==3.0.4
+click==7.1.2
+colorama==0.4.3
+Flask==1.1.2
+Flask-HTTPAuth==4.0.0
+-e git+https://github.com/KoenradusXLVIII/SmartHouse@93913c6253d6545ed67a53a90cb72d4a412b214a#egg=hue&subdirectory=python\hue
+idna==2.9
+-e git+https://github.com/KoenradusXLVIII/SmartHouse@93913c6253d6545ed67a53a90cb72d4a412b214a#egg=IPCam&subdirectory=python\ipcam
+itsdangerous==1.1.0
+Jinja2==2.11.2
+MarkupSafe==1.1.1
+more-itertools==8.2.0
+-e git+https://github.com/KoenradusXLVIII/SmartHouse@93913c6253d6545ed67a53a90cb72d4a412b214a#egg=MQTT&subdirectory=python\mqtt
+-e git+https://github.com/KoenradusXLVIII/SmartHouse@93913c6253d6545ed67a53a90cb72d4a412b214a#egg=openweathermap&subdirectory=python\openweathermap
+-e git+https://github.com/KoenradusXLVIII/SmartHouse@93913c6253d6545ed67a53a90cb72d4a412b214a#egg=P1&subdirectory=python\p1
+packaging==20.3
+paho-mqtt==1.5.0
+phue==1.1
+pluggy==0.13.1
+psutil==5.7.0
+py==1.8.1
+pyparsing==2.4.7
+PyQt5==5.14.2
+PyQt5-sip==12.7.2
+pyserial==3.4
+pytest==5.4.1
+PyYAML==5.3.1
+requests==2.23.0
+responses==0.10.14
+six==1.14.0
+urllib3==1.25.9
+wcwidth==0.1.9
+Werkzeug==1.0.1
