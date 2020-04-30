@@ -10,14 +10,14 @@ import MQTT
 # Load configuration YAML
 path = os.path.dirname(os.path.realpath(__file__))
 fp = open(path + '/config.yaml', 'r')
-cfg = yaml.load(fp)
+cfg = yaml.safe_load(fp)
 
 # Set up MQTT client
 mqtt_client = MQTT.Client(**cfg['mqtt'])
-mqtt_client.subscribe('nodes/#')
+mqtt_client.subscribe(cfg['mqtt']['topic'])
 
 # Set up P1 client
-p1_client = P1.Client('/dev/ttyUSB0')
+p1_client = P1.Client(cfg['P1']['port'])
 
 def main():
     # Get P1 data
