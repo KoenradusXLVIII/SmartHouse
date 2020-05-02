@@ -1,0 +1,13 @@
+[Unit]
+Description=uWSGI instance to serve test
+After=network.target
+
+[Service]
+User=pi
+Group=www-data
+WorkingDirectory=/home/pi/SmartHouse/python/Flask_API
+Environment="PATH=/home/pi/.pyenv/versions/SmartHouse/bin/python"
+ExecStart=/home/pi/.pyenv/versions/SmartHouse/bin/uwsgi --ini /home/pi/SmartHouse/python/Flask_API/api.ini
+
+[Install]
+WantedBy=multi-user.target
