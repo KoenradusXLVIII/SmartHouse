@@ -7,12 +7,18 @@ from werkzeug.security import generate_password_hash, check_password_hash
 # Local imports
 import hue
 
+# Hue
+with open('config.yaml', 'r') as fp:
+    cfg = yaml.safe_load(fp)
+hue_client = hue.Client(cfg['hue']['ip'])
+hue_client.set_alarm_lights_by_name(cfg['hue']['alarm_lights'])
+
 # Flask
 app = Flask(__name__)
 auth = HTTPBasicAuth()
 
 users = {
-    "hue": generate_password_hash('crD8DtCID83bF*X*v&OyGjanbV339Bxs')
+    cfg['hue']['user']: generate_password_hash(cfg['hue']['pass'])
 }
 
 
@@ -63,6 +69,11 @@ def set_alarm():
         abort(400)
 
 
+@app.errorhandler(405)
+def not_found(error):
+    return make_response(jsonify({'error': 'method not allowed'}), 405)
+
+
 @app.errorhandler(404)
 def not_found(error):
     return make_response(jsonify({'error': 'not found'}), 404)
@@ -71,13 +82,6 @@ def not_found(error):
 @app.errorhandler(400)
 def not_found(error):
     return make_response(jsonify({'error': 'bad request'}), 404)
-
-
-# Hue
-with open('config.yaml', 'r') as fp:
-    cfg = yaml.safe_load(fp)
-hue_client = hue.Client(cfg['hue']['ip'])
-hue_client.set_alarm_lights_by_name(cfg['hue']['alarm_lights'])
 
 
 if __name__ == '__main__':
