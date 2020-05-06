@@ -4,27 +4,33 @@ import sys
 import paho.mqtt.client as mqtt
 import os
 import yaml
-import requests
-
-# Private imports
-import IPCam
+import uuid
+import socket
+from requests import get
 
 # Main function
 def main():
     # Load configuration YAML
     path = os.path.dirname(os.path.realpath(__file__))
     fp = open(path + '/config.yaml', 'r')
-    cfg = yaml.load(fp)
+    cfg = yaml.safe_load(fp)
 
     # Set up MQTT client
     mqtt_client = mqtt.Client()
-    mqtt_client.username_pw_set(username='vjmpotre', password='#ukELk48z0js')
-    mqtt_client.connect('joostverberk.nl', 1883)
-    IPCam_motor = IPCam.Client(**cfg['ipcam']['motor'])
+    mqtt_client.username_pw_set(username=cfg['mqtt']['username'], password=cfg['mqtt']['password'])
+    mqtt_client.connect(cfg['mqtt']['host'], cfg['mqtt']['port'])
 
-    mqtt_client.publish('nodes/90A2DA0EC568/sensors/20', '1', retain=True)
-    #mqtt_client.publish('hue/scene', 'all_off', retain=True)
-    #mqtt_client.publish('nodes/00626E6DF34/image', IPCam_motor.snapshot(), retain=False)
+    # Retrieve network information
+    mac = hex(uuid.getnode())
+    mac = mac[2:-1].upper()
+    hostname = socket.gethostname()
+    internal_ip = socket.gethostbyname(hostname)
+    external_ip = get('https://api.ipify.org').text
+
+    # Publish to MQTT
+    mqtt_client.publish('nodes/{}/hostname'.format(mac), hostname, retain=True)
+    mqtt_client.publish('nodes/{}/internal_ip'.format(mac), internal_ip, retain=True)
+    mqtt_client.publish('nodes/{}/external_ip'.format(mac), external_ip, retain=True)
 
     # Blocking call that processes network traffic, dispatches callbacks and  handles reconnecting.
     mqtt_client.loop_start()
