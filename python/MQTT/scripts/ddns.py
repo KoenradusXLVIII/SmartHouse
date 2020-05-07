@@ -37,9 +37,9 @@ def main():
     external_ip = get('https://api.ipify.org').text
 
     # Publish to MQTT
-    mqtt_client.publish('{}/nodes/{}/hostname'.format(cfg['mqtt']['username'], mac), hostname, retain=True)
-    mqtt_client.publish('{}/nodes/{}/internal_ip'.format(cfg['mqtt']['username'], mac), internal_ip, retain=True)
-    mqtt_client.publish('{}/nodes/{}/external_ip'.format(cfg['mqtt']['username'], mac), external_ip, retain=True)
+    mqtt_client.publish('nodes/{}/{}/hostname'.format(cfg['mqtt']['username'], mac), hostname, retain=True)
+    mqtt_client.publish('nodes/{}/{}/internal_ip'.format(cfg['mqtt']['username'], mac), internal_ip, retain=True)
+    mqtt_client.publish('nodes/{}/{}/external_ip'.format(cfg['mqtt']['username'], mac), external_ip, retain=True)
 
     # Blocking call that processes network traffic, dispatches callbacks and  handles reconnecting.
     mqtt_client.loop_start()
