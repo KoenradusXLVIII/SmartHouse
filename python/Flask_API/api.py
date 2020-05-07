@@ -27,6 +27,17 @@ def verify_password(username, password):
     if username in users:
         return check_password_hash(users.get(username), password)
     return False
+    
+    
+@app.route('/', methods=['GET'])
+def home():
+    return '' 
+    
+@app.route('/api/', methods=['GET'])    
+@app.route('/api/1.0', methods=['GET'])
+@auth.login_required
+def api():
+    return '' 
 
 
 @app.route('/api/1.0/scene', methods=['GET'])
