@@ -22,7 +22,7 @@ def main():
 
     # Retrieve network information
     mac = hex(uuid.getnode())
-    mac = mac[2:-1].upper()
+    mac = mac[2:].upper()
     hostname = socket.gethostname()
     internal_ip = socket.gethostbyname(hostname)
     external_ip = get('https://api.ipify.org').text
