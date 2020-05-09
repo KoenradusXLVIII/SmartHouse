@@ -12,13 +12,6 @@ from datetime import datetime
 # Private packages
 import IPCam
 import MQTT
-import hue
-
-# Constants
-OFF = 0
-ON = 1
-DAY = 0
-NIGHT = 1
 
 # Functions
 def log_except_hook(*exc_info):
@@ -56,7 +49,7 @@ def main():
     # Load configuration YAML
     path = os.path.dirname(os.path.realpath(__file__))
     fp = open(path + '/config.yaml', 'r')
-    cfg = yaml.load(fp)
+    cfg = yaml.safe_load(fp)
 
     # Start deamon
     # PID file location
