@@ -6,13 +6,15 @@ click==7.1.2
 colorama==0.4.3
 Flask==1.1.2
 Flask-HTTPAuth==4.0.0
+-e git+https://github.com/KoenradusXLVIII/SmartHouse.git@eb0fb8b2cb50b234a533e249bd37b4535bee4a04#egg=hue&subdirectory=python/hue
 idna==2.9
+-e git+https://github.com/KoenradusXLVIII/SmartHouse.git@eb0fb8b2cb50b234a533e249bd37b4535bee4a04#egg=IPCam&subdirectory=python/IPCam
 itsdangerous==1.1.0
 Jinja2==2.11.2
 MarkupSafe==1.1.1
 more-itertools==8.2.0
--e git+https://github.com/KoenradusXLVIII/SmartHouse.git@426e563f049c929f520bf9b2dd78f7e501309a72#egg=MQTT&subdirectory=python/MQTT
--e git+https://github.com/KoenradusXLVIII/SmartHouse.git@426e563f049c929f520bf9b2dd78f7e501309a72#egg=P1&subdirectory=python/P1
+-e git+https://github.com/KoenradusXLVIII/SmartHouse.git@eb0fb8b2cb50b234a533e249bd37b4535bee4a04#egg=MQTT&subdirectory=python/MQTT
+-e git+https://github.com/KoenradusXLVIII/SmartHouse.git@eb0fb8b2cb50b234a533e249bd37b4535bee4a04#egg=P1&subdirectory=python/P1
 packaging==20.3
 paho-mqtt==1.5.0
 phue==1.1
@@ -28,5 +30,6 @@ requests==2.23.0
 responses==0.10.14
 six==1.14.0
 urllib3==1.25.9
+uWSGI==2.0.18
 wcwidth==0.1.9
 Werkzeug==1.0.1
