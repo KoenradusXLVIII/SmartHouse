@@ -70,6 +70,7 @@ class Client:
         if active:
             if not self._alarm_active:
                 # Store current light state
+                self._alarm_lights_state = [] 
                 for light in self._alarm_lights:
                     self._alarm_lights_state.append(self._get_light_state(light))
 

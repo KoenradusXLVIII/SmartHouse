@@ -12,13 +12,6 @@ from datetime import datetime
 # Private packages
 import IPCam
 import MQTT
-import hue
-
-# Constants
-OFF = 0
-ON = 1
-DAY = 0
-NIGHT = 1
 
 # Functions
 def log_except_hook(*exc_info):
@@ -56,7 +49,7 @@ def main():
     # Load configuration YAML
     path = os.path.dirname(os.path.realpath(__file__))
     fp = open(path + '/config.yaml', 'r')
-    cfg = yaml.load(fp)
+    cfg = yaml.safe_load(fp)
 
     # Start deamon
     # PID file location
@@ -101,23 +94,10 @@ def main():
         if IPCam_motor.new_recording():
             talk_log('New motion detected!')
             mqtt_client.publish(cfg['mqtt']['nodes']['smarthouse'], 93, 1)
-            mqtt_client.publish_image('00626E6DF34', IPCam_motor.snapshot())
-            last_motion = time.time()
-            alarm_on = True;
-        elif alarm_on:
-            # Alarm on, but is motion still ongoing?
-            if IPCam_motor.motion_detect():
-                # Motion still ongoing
-                last_motion = time.time()
-            else:
-                # Motion no longer ongoing, wait for timeout
-                if (time.time() - last_motion) > cfg['ipcam']['motion_timeout']:
-                    talk_log('Motion ended')
-                    mqtt_client.publish(cfg['mqtt']['nodes']['smarthouse'], 93, 0)
-                    alarm_on = False
 
 
 # Start of program
 if __name__ == "__main__":
     sys.excepthook = log_except_hook
     main()
+
