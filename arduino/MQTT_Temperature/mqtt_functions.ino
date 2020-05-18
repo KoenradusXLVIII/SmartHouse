@@ -79,16 +79,16 @@ void mqtt_subscribe(void)
 
     // Subscribe to my IO topic
     strcpy(charTopicSub, "nodes/");
-    strcat(charTopicPub, (const char *) MQTT_USER);
-    strcat(charTopicPub, (const char *) F("/"));
+    strcat(charTopicSub, (const char *) MQTT_USER);
+    strcat(charTopicSub, (const char *) F("/"));
     strcat(charTopicSub, node_uuid);
     strcat(charTopicSub, "/io/+");
     mqtt_client.subscribe(charTopicSub);
 
     // Subscribe to my update topic
     strcpy(charTopicSub, "nodes/");
-    strcat(charTopicPub, (const char *) MQTT_USER);
-    strcat(charTopicPub, (const char *) F("/"));
+    strcat(charTopicSub, (const char *) MQTT_USER);
+    strcat(charTopicSub, (const char *) F("/"));
     strcat(charTopicSub, node_uuid);
     strcat(charTopicSub, "/update");
     mqtt_client.subscribe(charTopicSub);

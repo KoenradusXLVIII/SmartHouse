@@ -40,15 +40,15 @@ bool EEPROM_initialized = false;
 // ============================= //
 
 #define IO_COUNT 1
-int IO_ID[IO_COUNT] = {85};
+int IO_ID[IO_COUNT] = {0};
 int IO_pin[IO_COUNT] = {0};
 unsigned long longPrevious[IO_COUNT+1];
 
 // DS18B20
 #define TEMP 0
 OneWire  ds(D2);  // on pin D2
-byte addr[8] = {0x28, 0xE0, 0xC4, 0x19, 0x17, 0x13, 0x01, 0x76};
-float calibration = 2.0;
+byte addr[8]; // {0x28, 0x61, 0x64, 0x11, 0xA9, 0x99, 0x20, 0x79}
+float calibration = 4.0;
 float temp_buf[BUF_LENGTH];
 
 // ============================= //
@@ -76,6 +76,9 @@ void setup() {
 
     // Setup OTA
     setup_OTA();
+
+    // Set DS18B20 address
+    getDeviceAddress(addr);
 
     // Setup MQTT broker connection
     mqtt_client.setServer(broker, port);
@@ -160,6 +163,36 @@ void mqtt_temp(bool timed) {
     mqtt_publish(IO_ID[TEMP], np.filt_mean(temp_buf, BUF_LENGTH, 1), 1);  
   else
     mqtt_publish(IO_ID[TEMP], np.filt_mean(temp_buf, BUF_LENGTH, 1));  
+}
+
+void getDeviceAddress(byte * addr) {
+  byte i;
+
+  /* initiate a search for the OneWire object we created and read its value into
+  addr array we declared above*/
+  
+  while(ds.search(addr)) {
+    Serial.print("DS18B20 address: ");
+    //read each byte in the address array
+    for( i = 0; i < 8; i++) {
+      Serial.print("0x");
+      if (addr[i] < 16) {
+        Serial.print('0');
+      }
+      // print each byte in the address array in hex format
+      Serial.print(addr[i], HEX);
+      if (i < 7) {
+        Serial.print(" ");
+      }
+    }
+    // a check to make sure that what we read is correct.
+    if ( OneWire::crc8( addr, 7) != addr[7]) {
+        Serial.print("CRC is not valid!\n");
+        return;
+    }
+  }
+  ds.reset_search();
+  Serial.println("");
 }
 
 float DS18B20_read(byte * addr){
