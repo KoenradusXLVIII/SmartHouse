@@ -33,7 +33,7 @@ def on_message(client, userdata, msg):
             payload['data']['switch'] = 'on'
         else:
             payload['data']['switch'] = 'off'
-        requests.post('%s:%d/%s' % (cfg['sonoff']['host'], cfg['sonoff']['port'], cfg['sonoff']['switch']), json=payload)
+        requests.post('%s:%d/%s' % (cfg['sonoff']['host'], cfg['sonoff']['port'], cfg['sonoff']['switch']), json=payload, timeout=1)
 
 # Main function
 def main():
