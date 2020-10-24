@@ -56,9 +56,9 @@ def main():
             # Turn it on
             mqtt_client.publish(front_door_light_topic, 1, retain=True)
     else: # It is day
-        if front_door_light_value: # And the light is off
+        if front_door_light_value: # And the light is on
             # Turn it off
-            mqtt_client.publish(front_door_light_topic, 1, retain=True)
+            mqtt_client.publish(front_door_light_topic, 0, retain=True)
 
     # Publish any changes
     mqtt_client.loop_start()
