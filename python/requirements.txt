@@ -10,7 +10,7 @@ Flask-HTTPAuth==4.0.0
 idna==2.9
 -e git+https://github.com/KoenradusXLVIII/SmartHouse.git@eb0fb8b2cb50b234a533e249bd37b4535bee4a04#egg=IPCam&subdirectory=python/IPCam
 itsdangerous==1.1.0
-Jinja2==2.11.2
+Jinja2==2.11.3
 MarkupSafe==1.1.1
 more-itertools==8.2.0
 -e git+https://github.com/KoenradusXLVIII/SmartHouse.git@eb0fb8b2cb50b234a533e249bd37b4535bee4a04#egg=MQTT&subdirectory=python/MQTT
